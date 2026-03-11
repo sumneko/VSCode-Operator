@@ -1,0 +1,55 @@
+{
+  "name": "codepilot",
+  "displayName": "CodePilot MCP Extension",
+  "version": "0.0.1",
+  "description": "A VS Code extension scaffold with an embedded MCP server framework.",
+  "main": "./dist/extension.js",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext .ts",
+    "test": "echo \"No tests configured yet\""
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "codepilot.startMcpServer",
+        "title": "CodePilot: Start MCP Server"
+      },
+      {
+        "command": "codepilot.stopMcpServer",
+        "title": "CodePilot: Stop MCP Server"
+      }
+    ]
+  },
+  "keywords": [
+    "vscode",
+    "mcp",
+    "extension"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "@types/vscode": "^1.110.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
+    "esbuild": "^0.27.3",
+    "eslint": "^10.0.3",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
+  }
+}
