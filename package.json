@@ -30,7 +30,7 @@
         ],
         "toolReferenceName": "readProblems",
         "displayName": "Read VS Code Problems",
-        "modelDescription": "Read diagnostics currently shown in the VS Code Problems panel, including file path, severity, message, source, and range.",
+        "modelDescription": "Call this tool BEFORE attempting any fix, refactor, or code-quality task. It returns all diagnostics from the VS Code Problems panel (errors, warnings, hints) with file path, severity, message, source, code, and precise line/column range. Always read problems first when the user reports build errors, type errors, lint issues, or asks you to fix the codebase.",
         "userDescription": "Read the current VS Code Problems panel diagnostics.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -40,6 +40,78 @@
               "type": "number",
               "description": "Maximum number of diagnostics to return",
               "default": 200
+            }
+          }
+        }
+      },
+      {
+        "name": "codepilot_runSupportedCommand",
+        "tags": [
+          "vscode",
+          "command",
+          "optimized"
+        ],
+        "toolReferenceName": "runSupportedCommand",
+        "displayName": "Run Supported Command",
+        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary when you need to know the currently open file, language, or cursor position. Use action=hoverTopVisible when you need to understand what symbol or type is at the top of the visible region of the active editor. Use action=hoverAtPosition with line and column (1-based) to get hover info at a specific position in the active editor — prefer this over codepilot_executeCommand for hover queries. Prefer this tool over codepilot_executeCommand for these actions.",
+        "userDescription": "Run optimized VS Code command actions.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "action"
+          ],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "hoverTopVisible",
+                "activeEditorSummary",
+                "hoverAtPosition"
+              ],
+              "description": "Supported command action name. Use hoverAtPosition to get hover info at a specific 1-based line/column in the active editor."
+            },
+            "line": {
+              "type": "number",
+              "description": "1-based line number (required for hoverAtPosition)"
+            },
+            "column": {
+              "type": "number",
+              "description": "1-based column number (required for hoverAtPosition)"
+            }
+          }
+        }
+      },
+      {
+        "name": "codepilot_executeCommand",
+        "tags": [
+          "vscode",
+          "command",
+          "generic"
+        ],
+        "toolReferenceName": "executeCommand",
+        "displayName": "Execute VS Code Command",
+        "modelDescription": "Call this tool to execute any VS Code command by its command id when no specialized tool covers the need. Examples: open a file (vscode.open), show a definition (vscode.executeDefinitionProvider), trigger a code action (editor.action.quickFix), or inspect symbol references. Pass arguments as the args array or as argsJson (JSON-encoded array string). The tool returns the command result as text. Use codepilot_runSupportedCommand first for hoverTopVisible and activeEditorSummary.",
+        "userDescription": "Execute any VS Code command.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "command"
+          ],
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "VS Code command id"
+            },
+            "args": {
+              "type": "array",
+              "items": {},
+              "description": "Command arguments array"
+            },
+            "argsJson": {
+              "type": "string",
+              "description": "Alternative JSON string for args, must decode to an array"
             }
           }
         }

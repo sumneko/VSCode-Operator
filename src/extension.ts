@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
-import { ReadProblemsTool } from "./features";
+import { ExecuteCommandTool, ReadProblemsTool, RunSupportedCommandTool } from "./features";
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.lm.registerTool("codepilot_readProblems", new ReadProblemsTool())
+    vscode.lm.registerTool("codepilot_readProblems", new ReadProblemsTool()),
+    vscode.lm.registerTool("codepilot_runSupportedCommand", new RunSupportedCommandTool()),
+    vscode.lm.registerTool("codepilot_executeCommand", new ExecuteCommandTool())
   );
 }
 
