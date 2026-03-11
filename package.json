@@ -20,6 +20,31 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "languageModelTools": [
+      {
+        "name": "codepilot_readProblems",
+        "tags": [
+          "vscode",
+          "problems",
+          "diagnostics"
+        ],
+        "toolReferenceName": "readProblems",
+        "displayName": "Read VS Code Problems",
+        "modelDescription": "Read diagnostics currently shown in the VS Code Problems panel, including file path, severity, message, source, and range.",
+        "userDescription": "Read the current VS Code Problems panel diagnostics.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "maxItems": {
+              "type": "number",
+              "description": "Maximum number of diagnostics to return",
+              "default": 200
+            }
+          }
+        }
+      }
+    ],
     "commands": [
       {
         "command": "codepilot.startMcpServer",
