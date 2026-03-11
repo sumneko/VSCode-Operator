@@ -53,7 +53,7 @@
         ],
         "toolReferenceName": "runSupportedCommand",
         "displayName": "Run Supported Command",
-        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary when you need to know the currently open file, language, or cursor position. Use action=hoverTopVisible when you need to understand what symbol or type is at the top of the visible region of the active editor. Use action=hoverAtPosition with line and column (1-based) to get hover info at a specific position in the active editor — prefer this over codepilot_executeCommand for hover queries. Prefer this tool over codepilot_executeCommand for these actions.",
+        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary to get the currently open file, language, and cursor. Use action=hoverTopVisible for hover info at the top visible line. Use action=hoverAtPosition with line+column (1-based) for hover info at a specific position. Use action=completionAt with line+column (and optional triggerCharacter) to get LSP completions at a position — call this ONCE per unfamiliar type at the start of a coding task to discover correct member names, rather than before every individual method call. Prefer this tool over codepilot_executeCommand for these actions.",
         "userDescription": "Run optimized VS Code command actions.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -67,9 +67,10 @@
               "enum": [
                 "hoverTopVisible",
                 "activeEditorSummary",
-                "hoverAtPosition"
+                "hoverAtPosition",
+                "completionAt"
               ],
-              "description": "Supported command action name. Use hoverAtPosition to get hover info at a specific 1-based line/column in the active editor."
+              "description": "Supported action. Use completionAt to query LSP member completions before generating method/property accesses."
             },
             "line": {
               "type": "number",
@@ -77,7 +78,11 @@
             },
             "column": {
               "type": "number",
-              "description": "1-based column number (required for hoverAtPosition)"
+              "description": "1-based column number (required for hoverAtPosition and completionAt)"
+            },
+            "triggerCharacter": {
+              "type": "string",
+              "description": "Optional trigger character for completionAt (e.g. \":\" for Lua method call, \".\" for property access)"
             }
           }
         }

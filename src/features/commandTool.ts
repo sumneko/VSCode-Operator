@@ -1,13 +1,15 @@
 import * as vscode from "vscode";
 
-type SupportedAction = "hoverTopVisible" | "activeEditorSummary" | "hoverAtPosition";
+type SupportedAction = "hoverTopVisible" | "activeEditorSummary" | "hoverAtPosition" | "completionAt";
 
 type SupportedCommandToolInput = {
   action: SupportedAction;
-  /** For hoverAtPosition: line number (1-based) */
+  /** For hoverAtPosition / completionAt: line number (1-based) */
   line?: number;
-  /** For hoverAtPosition: column number (1-based) */
+  /** For hoverAtPosition / completionAt: column number (1-based) */
   column?: number;
+  /** For completionAt: optional trigger character (e.g. ":" or ".") */
+  triggerCharacter?: string;
 };
 
 type ExecuteCommandToolInput = {
@@ -225,6 +227,81 @@ export class RunSupportedCommandTool implements vscode.LanguageModelTool<Support
 
       return new vscode.LanguageModelToolResult([
         new vscode.LanguageModelTextPart(summary)
+      ]);
+    }
+
+    if (action === "completionAt") {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        return new vscode.LanguageModelToolResult([
+          new vscode.LanguageModelTextPart("No active text editor.")
+        ]);
+      }
+
+      const line = typeof options.input.line === "number" ? options.input.line - 1 : 0;
+      const col = typeof options.input.column === "number" ? options.input.column - 1 : 0;
+      const position = new vscode.Position(Math.max(0, line), Math.max(0, col));
+
+      const completionList = await vscode.commands.executeCommand<vscode.CompletionList>(
+        "vscode.executeCompletionItemProvider",
+        editor.document.uri,
+        position,
+        options.input.triggerCharacter
+      );
+
+      if (!completionList || completionList.items.length === 0) {
+        return new vscode.LanguageModelToolResult([
+          new vscode.LanguageModelTextPart(
+            `No completions at line ${line + 1}, column ${col + 1}.`
+          )
+        ]);
+      }
+
+      const kindLabel = (kind?: vscode.CompletionItemKind): string => {
+        const map: Partial<Record<vscode.CompletionItemKind, string>> = {
+          [vscode.CompletionItemKind.Method]: "method",
+          [vscode.CompletionItemKind.Function]: "function",
+          [vscode.CompletionItemKind.Field]: "field",
+          [vscode.CompletionItemKind.Property]: "property",
+          [vscode.CompletionItemKind.Variable]: "variable",
+          [vscode.CompletionItemKind.Class]: "class",
+          [vscode.CompletionItemKind.Interface]: "interface",
+          [vscode.CompletionItemKind.Constant]: "constant",
+          [vscode.CompletionItemKind.Enum]: "enum",
+          [vscode.CompletionItemKind.EnumMember]: "enum member"
+        };
+        return kind !== undefined ? (map[kind] ?? "item") : "item";
+      };
+
+      const docText = (item: vscode.CompletionItem): string => {
+        if (!item.documentation) return "";
+        if (item.documentation instanceof vscode.MarkdownString) return item.documentation.value;
+        return String(item.documentation);
+      };
+
+      const maxItems = 200;
+      const items = completionList.items.slice(0, maxItems);
+      const lines = items.map((item) => {
+        const label = typeof item.label === "string" ? item.label : item.label.label;
+        const detail = typeof item.label === "object" && item.label.detail
+          ? item.label.detail
+          : (item.detail ?? "");
+        const kind = kindLabel(item.kind);
+        const doc = docText(item);
+        const parts = [`- ${label} (${kind})`];
+        if (detail) parts.push(detail);
+        if (doc) parts.push(`// ${doc.split("\n")[0]}`);
+        return parts.join("  ");
+      });
+
+      const total = completionList.items.length;
+      const header = [
+        `Completions at line ${line + 1}, column ${col + 1} in ${editor.document.uri.fsPath}`,
+        total > maxItems ? `(showing ${maxItems} of ${total} items)` : `(${total} items)`
+      ].join(" ");
+
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart([header, ...lines].join("\n"))
       ]);
     }
 

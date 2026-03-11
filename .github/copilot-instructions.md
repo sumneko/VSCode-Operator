@@ -14,7 +14,9 @@
 **何时调用：**
 - 需要了解当前打开的文件、语言或光标位置时 → `action=activeEditorSummary`
 - 需要理解编辑器可视区域顶部某个符号、类型或注释信息时 → `action=hoverTopVisible`
-- 上述两个场景**优先使用本工具**，不要使用 `codepilot_executeCommand`
+- 需要查询指定行列的 hover/类型信息时 → `action=hoverAtPosition`（需传 `line`、`column`，1-based）
+- 对**不熟悉的类型或 API**（不确定方法名、属性名时），在开始编写该段代码前，用 `action=completionAt` 集中查询相关位置的 LSP 补全，确认正确的成员名称（需传 `line`、`column`，1-based；可选传 `triggerCharacter`，如 Lua 用 `":"` 、JS/TS 用 `"."`）；不需要在每一个成员访问前都查询
+- 上述场景**优先使用本工具**，不要使用 `codepilot_executeCommand`
 
 ### `codepilot_executeCommand`
 **何时调用：**
