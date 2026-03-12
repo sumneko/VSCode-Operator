@@ -1,14 +1,21 @@
 import * as vscode from "vscode";
 
-type SupportedAction = "hoverTopVisible" | "activeEditorSummary" | "hoverAtPosition" | "completionAt";
+type ActiveEditorSummaryToolInput = Record<string, never>;
+type HoverTopVisibleToolInput = Record<string, never>;
 
-type SupportedCommandToolInput = {
-  action: SupportedAction;
-  /** For hoverAtPosition / completionAt: line number (1-based) */
+type HoverAtPositionToolInput = {
+  /** 1-based line number */
   line?: number;
-  /** For hoverAtPosition / completionAt: column number (1-based) */
+  /** 1-based column number */
   column?: number;
-  /** For completionAt: optional trigger character (e.g. ":" or ".") */
+};
+
+type CompletionAtToolInput = {
+  /** 1-based line number */
+  line?: number;
+  /** 1-based column number */
+  column?: number;
+  /** Optional trigger character (e.g. ":" or ".") */
   triggerCharacter?: string;
 };
 
@@ -132,11 +139,11 @@ function parseArgs(input: ExecuteCommandToolInput): unknown[] {
   return raw.map(tryDeserializeUri);
 }
 
-async function resolveTargetDocument(filePath?: string): Promise<vscode.TextDocument | undefined> {
+async function resolveTargetDocument(): Promise<vscode.TextDocument | undefined> {
   return vscode.window.activeTextEditor?.document;
 }
 
-function getPosition(document: vscode.TextDocument, input: SupportedCommandToolInput): vscode.Position {
+function getPosition(document: vscode.TextDocument, input: { line: number; column: number }): vscode.Position {
   const inputLine = input.line! - 1;
   const inputCol = input.column! - 1;
 
@@ -147,227 +154,271 @@ function getPosition(document: vscode.TextDocument, input: SupportedCommandToolI
   return new vscode.Position(line, character);
 }
 
-function getUnsupportedInputKeys(input: SupportedCommandToolInput): string[] {
-  const allowedByAction: Partial<Record<SupportedAction, Set<string>>> = {
-    activeEditorSummary: new Set(["action"]),
-    hoverTopVisible: new Set(["action"]),
-    hoverAtPosition: new Set(["action", "line", "column"]),
-    completionAt: new Set(["action", "line", "column", "triggerCharacter"])
-  };
-
-  const allowed = allowedByAction[input.action] ?? new Set(["action"]);
-  return Object.keys(input as Record<string, unknown>).filter((key) => !allowed.has(key));
+function getUnsupportedInputKeys(input: Record<string, unknown>, allowed: string[]): string[] {
+  const allowedSet = new Set(allowed);
+  return Object.keys(input).filter((key) => !allowedSet.has(key));
 }
 
-function buildInputValidationError(action: SupportedAction, details: string): string {
+function buildInputValidationError(toolName: string, details: string): string {
   return [
-    `Invalid input for ${action}: ${details}`,
+    `Invalid input for ${toolName}: ${details}`,
     "Use exact parameter names from tools/list inputSchema.",
     "If unsure, read resource vscode-operator://usage."
   ].join(" ");
 }
 
-function validateActionInput(input: SupportedCommandToolInput): string | undefined {
-  const unsupportedKeys = getUnsupportedInputKeys(input);
+function validateNoFields(toolName: string, input: Record<string, unknown>): string | undefined {
+  const unsupportedKeys = getUnsupportedInputKeys(input, []);
   if (unsupportedKeys.length > 0) {
-    return buildInputValidationError(input.action, `unsupported fields: ${unsupportedKeys.join(", ")}.`);
+    return buildInputValidationError(toolName, `unsupported fields: ${unsupportedKeys.join(", ")}.`);
   }
 
-  if (input.action === "hoverAtPosition" || input.action === "completionAt") {
-    if (!Number.isInteger(input.line) || (input.line as number) < 1) {
-      return buildInputValidationError(input.action, "line must be an integer >= 1.");
-    }
-    if (!Number.isInteger(input.column) || (input.column as number) < 1) {
-      return buildInputValidationError(input.action, "column must be an integer >= 1.");
-    }
+  return undefined;
+}
+
+function validatePositionInput(
+  toolName: string,
+  input: Record<string, unknown>,
+  allowTriggerCharacter: boolean
+): string | undefined {
+  const allowed = allowTriggerCharacter ? ["line", "column", "triggerCharacter"] : ["line", "column"];
+  const unsupportedKeys = getUnsupportedInputKeys(input, allowed);
+  if (unsupportedKeys.length > 0) {
+    return buildInputValidationError(toolName, `unsupported fields: ${unsupportedKeys.join(", ")}.`);
   }
 
-  if (input.action === "completionAt" && input.triggerCharacter !== undefined) {
-    if (typeof input.triggerCharacter !== "string" || input.triggerCharacter.length === 0) {
-      return buildInputValidationError(input.action, "triggerCharacter must be a non-empty string when provided.");
+  const line = input["line"];
+  const column = input["column"];
+  if (!Number.isInteger(line) || (line as number) < 1) {
+    return buildInputValidationError(toolName, "line must be an integer >= 1.");
+  }
+  if (!Number.isInteger(column) || (column as number) < 1) {
+    return buildInputValidationError(toolName, "column must be an integer >= 1.");
+  }
+
+  if (allowTriggerCharacter && input["triggerCharacter"] !== undefined) {
+    const triggerCharacter = input["triggerCharacter"];
+    if (typeof triggerCharacter !== "string" || triggerCharacter.length === 0) {
+      return buildInputValidationError(toolName, "triggerCharacter must be a non-empty string when provided.");
     }
   }
 
   return undefined;
 }
 
-export class RunSupportedCommandTool implements vscode.LanguageModelTool<SupportedCommandToolInput> {
+export class ActiveEditorSummaryTool implements vscode.LanguageModelTool<ActiveEditorSummaryToolInput> {
   async invoke(
-    options: vscode.LanguageModelToolInvocationOptions<SupportedCommandToolInput>
+    options: vscode.LanguageModelToolInvocationOptions<ActiveEditorSummaryToolInput>
   ): Promise<vscode.LanguageModelToolResult> {
-    const action = options.input.action;
-    const validationError = validateActionInput(options.input);
+    const validationError = validateNoFields("vscodeOperator_activeEditorSummary", options.input as Record<string, unknown>);
     if (validationError) {
       return new vscode.LanguageModelToolResult([
         new vscode.LanguageModelTextPart(validationError)
       ]);
     }
 
-    if (action === "activeEditorSummary") {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) {
-        return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart("No active text editor.")
-        ]);
-      }
-
-      const selection = editor.selection.active;
-      const summary = [
-        `Active file: ${editor.document.uri.fsPath}`,
-        `Language: ${editor.document.languageId}`,
-        `Cursor: line ${selection.line + 1}, column ${selection.character + 1}`
-      ].join("\n");
-
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
       return new vscode.LanguageModelToolResult([
-        new vscode.LanguageModelTextPart(summary)
+        new vscode.LanguageModelTextPart("No active text editor.")
       ]);
     }
 
-    if (action === "hoverTopVisible") {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) {
-        return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart("No active text editor.")
-        ]);
-      }
-
-      const top = editor.visibleRanges[0]?.start ?? editor.selection.active;
-      const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
-        "vscode.executeHoverProvider",
-        editor.document.uri,
-        top
-      );
-
-      if (!hovers || hovers.length === 0) {
-        return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart(
-            `No hover information at line ${top.line + 1}, column ${top.character + 1}.`
-          )
-        ]);
-      }
-
-      const body = hovers.map(hoverContentsToText).filter((text) => text.length > 0).join("\n\n");
-      const summary = [
-        `Hover at top visible position in ${editor.document.uri.fsPath}`,
-        `Location: line ${top.line + 1}, column ${top.character + 1}`,
-        body.length > 0 ? body : "Hover content exists but is empty."
-      ].join("\n\n");
-
-      return new vscode.LanguageModelToolResult([
-        new vscode.LanguageModelTextPart(summary)
-      ]);
-    }
-
-    if (action === "hoverAtPosition") {
-      const document = await resolveTargetDocument();
-      if (!document) {
-        return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart("No active text editor.")
-        ]);
-      }
-
-      const position = getPosition(document, options.input);
-
-      const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
-        "vscode.executeHoverProvider",
-        document.uri,
-        position
-      );
-
-      if (!hovers || hovers.length === 0) {
-        return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart(
-            `No hover information at line ${position.line + 1}, column ${position.character + 1}.`
-          )
-        ]);
-      }
-
-      const body = hovers.map(hoverContentsToText).filter((text) => text.length > 0).join("\n\n");
-      const summary = [
-        `Hover at line ${position.line + 1}, column ${position.character + 1} in ${document.uri.fsPath}`,
-        body.length > 0 ? body : "Hover content exists but is empty."
-      ].join("\n\n");
-
-      return new vscode.LanguageModelToolResult([
-        new vscode.LanguageModelTextPart(summary)
-      ]);
-    }
-
-    if (action === "completionAt") {
-      const document = await resolveTargetDocument();
-      if (!document) {
-        return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart("No active text editor.")
-        ]);
-      }
-
-      const position = getPosition(document, options.input);
-
-      const completionList = await vscode.commands.executeCommand<vscode.CompletionList>(
-        "vscode.executeCompletionItemProvider",
-        document.uri,
-        position,
-        options.input.triggerCharacter
-      );
-
-      if (!completionList || completionList.items.length === 0) {
-        return new vscode.LanguageModelToolResult([
-          new vscode.LanguageModelTextPart(
-            `No completions at line ${position.line + 1}, column ${position.character + 1}.`
-          )
-        ]);
-      }
-
-      const kindLabel = (kind?: vscode.CompletionItemKind): string => {
-        const map: Partial<Record<vscode.CompletionItemKind, string>> = {
-          [vscode.CompletionItemKind.Method]: "method",
-          [vscode.CompletionItemKind.Function]: "function",
-          [vscode.CompletionItemKind.Field]: "field",
-          [vscode.CompletionItemKind.Property]: "property",
-          [vscode.CompletionItemKind.Variable]: "variable",
-          [vscode.CompletionItemKind.Class]: "class",
-          [vscode.CompletionItemKind.Interface]: "interface",
-          [vscode.CompletionItemKind.Constant]: "constant",
-          [vscode.CompletionItemKind.Enum]: "enum",
-          [vscode.CompletionItemKind.EnumMember]: "enum member"
-        };
-        return kind !== undefined ? (map[kind] ?? "item") : "item";
-      };
-
-      const docText = (item: vscode.CompletionItem): string => {
-        if (!item.documentation) return "";
-        if (item.documentation instanceof vscode.MarkdownString) return item.documentation.value;
-        return String(item.documentation);
-      };
-
-      const maxItems = 200;
-      const items = completionList.items.slice(0, maxItems);
-      const lines = items.map((item) => {
-        const label = typeof item.label === "string" ? item.label : item.label.label;
-        const detail = typeof item.label === "object" && item.label.detail
-          ? item.label.detail
-          : (item.detail ?? "");
-        const kind = kindLabel(item.kind);
-        const doc = docText(item);
-        const parts = [`- ${label} (${kind})`];
-        if (detail) parts.push(detail);
-        if (doc) parts.push(`// ${doc.split("\n")[0]}`);
-        return parts.join("  ");
-      });
-
-      const total = completionList.items.length;
-      const header = [
-        `Completions at line ${position.line + 1}, column ${position.character + 1} in ${document.uri.fsPath}`,
-        total > maxItems ? `(showing ${maxItems} of ${total} items)` : `(${total} items)`
-      ].join(" ");
-
-      return new vscode.LanguageModelToolResult([
-        new vscode.LanguageModelTextPart([header, ...lines].join("\n"))
-      ]);
-    }
+    const selection = editor.selection.active;
+    const summary = [
+      `Active file: ${editor.document.uri.fsPath}`,
+      `Language: ${editor.document.languageId}`,
+      `Cursor: line ${selection.line + 1}, column ${selection.character + 1}`
+    ].join("\n");
 
     return new vscode.LanguageModelToolResult([
-      new vscode.LanguageModelTextPart(`Unsupported action: ${action}`)
+      new vscode.LanguageModelTextPart(summary)
+    ]);
+  }
+}
+
+export class HoverTopVisibleTool implements vscode.LanguageModelTool<HoverTopVisibleToolInput> {
+  async invoke(
+    options: vscode.LanguageModelToolInvocationOptions<HoverTopVisibleToolInput>
+  ): Promise<vscode.LanguageModelToolResult> {
+    const validationError = validateNoFields("vscodeOperator_hoverTopVisible", options.input as Record<string, unknown>);
+    if (validationError) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(validationError)
+      ]);
+    }
+
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart("No active text editor.")
+      ]);
+    }
+
+    const top = editor.visibleRanges[0]?.start ?? editor.selection.active;
+    const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+      "vscode.executeHoverProvider",
+      editor.document.uri,
+      top
+    );
+
+    if (!hovers || hovers.length === 0) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(
+          `No hover information at line ${top.line + 1}, column ${top.character + 1}.`
+        )
+      ]);
+    }
+
+    const body = hovers.map(hoverContentsToText).filter((text) => text.length > 0).join("\n\n");
+    const summary = [
+      `Hover at top visible position in ${editor.document.uri.fsPath}`,
+      `Location: line ${top.line + 1}, column ${top.character + 1}`,
+      body.length > 0 ? body : "Hover content exists but is empty."
+    ].join("\n\n");
+
+    return new vscode.LanguageModelToolResult([
+      new vscode.LanguageModelTextPart(summary)
+    ]);
+  }
+}
+
+export class HoverAtPositionTool implements vscode.LanguageModelTool<HoverAtPositionToolInput> {
+  async invoke(
+    options: vscode.LanguageModelToolInvocationOptions<HoverAtPositionToolInput>
+  ): Promise<vscode.LanguageModelToolResult> {
+    const validationError = validatePositionInput(
+      "vscodeOperator_hoverAtPosition",
+      options.input as Record<string, unknown>,
+      false
+    );
+    if (validationError) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(validationError)
+      ]);
+    }
+
+    const document = await resolveTargetDocument();
+    if (!document) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart("No active text editor.")
+      ]);
+    }
+
+    const input = options.input as HoverAtPositionToolInput & { line: number; column: number };
+    const position = getPosition(document, input);
+
+    const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+      "vscode.executeHoverProvider",
+      document.uri,
+      position
+    );
+
+    if (!hovers || hovers.length === 0) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(
+          `No hover information at line ${position.line + 1}, column ${position.character + 1}.`
+        )
+      ]);
+    }
+
+    const body = hovers.map(hoverContentsToText).filter((text) => text.length > 0).join("\n\n");
+    const summary = [
+      `Hover at line ${position.line + 1}, column ${position.character + 1} in ${document.uri.fsPath}`,
+      body.length > 0 ? body : "Hover content exists but is empty."
+    ].join("\n\n");
+
+    return new vscode.LanguageModelToolResult([
+      new vscode.LanguageModelTextPart(summary)
+    ]);
+  }
+}
+
+export class CompletionAtTool implements vscode.LanguageModelTool<CompletionAtToolInput> {
+  async invoke(
+    options: vscode.LanguageModelToolInvocationOptions<CompletionAtToolInput>
+  ): Promise<vscode.LanguageModelToolResult> {
+    const validationError = validatePositionInput(
+      "vscodeOperator_completionAt",
+      options.input as Record<string, unknown>,
+      true
+    );
+    if (validationError) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(validationError)
+      ]);
+    }
+
+    const document = await resolveTargetDocument();
+    if (!document) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart("No active text editor.")
+      ]);
+    }
+
+    const input = options.input as CompletionAtToolInput & { line: number; column: number };
+    const position = getPosition(document, input);
+
+    const completionList = await vscode.commands.executeCommand<vscode.CompletionList>(
+      "vscode.executeCompletionItemProvider",
+      document.uri,
+      position,
+      options.input.triggerCharacter
+    );
+
+    if (!completionList || completionList.items.length === 0) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(
+          `No completions at line ${position.line + 1}, column ${position.character + 1}.`
+        )
+      ]);
+    }
+
+    const kindLabel = (kind?: vscode.CompletionItemKind): string => {
+      const map: Partial<Record<vscode.CompletionItemKind, string>> = {
+        [vscode.CompletionItemKind.Method]: "method",
+        [vscode.CompletionItemKind.Function]: "function",
+        [vscode.CompletionItemKind.Field]: "field",
+        [vscode.CompletionItemKind.Property]: "property",
+        [vscode.CompletionItemKind.Variable]: "variable",
+        [vscode.CompletionItemKind.Class]: "class",
+        [vscode.CompletionItemKind.Interface]: "interface",
+        [vscode.CompletionItemKind.Constant]: "constant",
+        [vscode.CompletionItemKind.Enum]: "enum",
+        [vscode.CompletionItemKind.EnumMember]: "enum member"
+      };
+      return kind !== undefined ? (map[kind] ?? "item") : "item";
+    };
+
+    const docText = (item: vscode.CompletionItem): string => {
+      if (!item.documentation) return "";
+      if (item.documentation instanceof vscode.MarkdownString) return item.documentation.value;
+      return String(item.documentation);
+    };
+
+    const maxItems = 200;
+    const items = completionList.items.slice(0, maxItems);
+    const lines = items.map((item) => {
+      const label = typeof item.label === "string" ? item.label : item.label.label;
+      const detail = typeof item.label === "object" && item.label.detail
+        ? item.label.detail
+        : (item.detail ?? "");
+      const kind = kindLabel(item.kind);
+      const doc = docText(item);
+      const parts = [`- ${label} (${kind})`];
+      if (detail) parts.push(detail);
+      if (doc) parts.push(`// ${doc.split("\n")[0]}`);
+      return parts.join("  ");
+    });
+
+    const total = completionList.items.length;
+    const header = [
+      `Completions at line ${position.line + 1}, column ${position.character + 1} in ${document.uri.fsPath}`,
+      total > maxItems ? `(showing ${maxItems} of ${total} items)` : `(${total} items)`
+    ].join(" ");
+
+    return new vscode.LanguageModelToolResult([
+      new vscode.LanguageModelTextPart([header, ...lines].join("\n"))
     ]);
   }
 }

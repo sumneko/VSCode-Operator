@@ -81,44 +81,99 @@
         }
       },
       {
-        "name": "vscodeOperator_runSupportedCommand",
+        "name": "vscodeOperator_activeEditorSummary",
         "tags": [
           "vscode",
-          "command",
-          "optimized"
+          "editor",
+          "summary"
         ],
-        "toolReferenceName": "runSupportedCommand",
-        "displayName": "Run Supported Command",
-        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary to get the currently open file, language, and cursor. Use action=hoverTopVisible for hover info at the top visible line. Use action=hoverAtPosition with line+column (1-based) for hover info at a specific position. Use action=completionAt with line+column (and optional triggerCharacter) to get LSP completions at a position — call this ONCE per unfamiliar type at the start of a coding task to discover correct member names, rather than before every individual method call. Always follow tools/list inputSchema exactly; unsupported fields are rejected. Prefer this tool over vscodeOperator_executeCommand for these actions.",
-        "userDescription": "Run optimized VS Code command actions.",
+        "toolReferenceName": "activeEditorSummary",
+        "displayName": "Get Active Editor Summary",
+        "modelDescription": "Call this tool to get the currently active file path, language id, and cursor position from VS Code. This tool takes no input fields.",
+        "userDescription": "Get active editor file/language/cursor summary.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "vscodeOperator_hoverTopVisible",
+        "tags": [
+          "vscode",
+          "hover",
+          "editor"
+        ],
+        "toolReferenceName": "hoverTopVisible",
+        "displayName": "Get Hover At Top Visible",
+        "modelDescription": "Call this tool to query hover/type information at the top currently visible position in the active editor. This tool takes no input fields.",
+        "userDescription": "Get hover info at top visible position.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "vscodeOperator_hoverAtPosition",
+        "tags": [
+          "vscode",
+          "hover",
+          "position"
+        ],
+        "toolReferenceName": "hoverAtPosition",
+        "displayName": "Get Hover At Position",
+        "modelDescription": "Call this tool to get hover/type information at a specific position in the active editor.",
+        "userDescription": "Get hover info at a specific line/column.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
           "type": "object",
           "required": [
-            "action"
+            "line",
+            "column"
           ],
           "properties": {
-            "action": {
-              "type": "string",
-              "enum": [
-                "hoverTopVisible",
-                "activeEditorSummary",
-                "hoverAtPosition",
-                "completionAt"
-              ],
-              "description": "Supported action. Use completionAt to query LSP member completions before generating method/property accesses."
-            },
             "line": {
               "type": "number",
-              "description": "1-based line number (required for hoverAtPosition)"
+              "description": "1-based line number"
             },
             "column": {
               "type": "number",
-              "description": "1-based column number (required for hoverAtPosition and completionAt)"
+              "description": "1-based column number"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_completionAt",
+        "tags": [
+          "vscode",
+          "completion",
+          "lsp"
+        ],
+        "toolReferenceName": "completionAt",
+        "displayName": "Get Completion At Position",
+        "modelDescription": "Call this tool to get LSP completion candidates at a specific line/column in the active editor.",
+        "userDescription": "Get completions at a specific line/column.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "line",
+            "column"
+          ],
+          "properties": {
+            "line": {
+              "type": "number",
+              "description": "1-based line number"
+            },
+            "column": {
+              "type": "number",
+              "description": "1-based column number"
             },
             "triggerCharacter": {
               "type": "string",
-              "description": "Optional trigger character for completionAt (e.g. \":\" for Lua method call, \".\" for property access)"
+              "description": "Optional trigger character for completion (e.g. \":\" for Lua method call, \".\" for property access)"
             }
           }
         }
@@ -132,7 +187,7 @@
         ],
         "toolReferenceName": "executeCommand",
         "displayName": "Execute VS Code Command",
-        "modelDescription": "Call this tool to execute any VS Code command by its command id when no specialized tool covers the need. Examples: open a file (vscode.open), show a definition (vscode.executeDefinitionProvider), trigger a code action (editor.action.quickFix), or inspect symbol references. Pass arguments as the args array or as argsJson (JSON-encoded array string). The tool returns the command result as text. Use vscodeOperator_runSupportedCommand first for hoverTopVisible and activeEditorSummary.",
+        "modelDescription": "Call this tool to execute any VS Code command by its command id when no specialized tool covers the need. Examples: open a file (vscode.open), show a definition (vscode.executeDefinitionProvider), trigger a code action (editor.action.quickFix), or inspect symbol references. Pass arguments as the args array or as argsJson (JSON-encoded array string). The tool returns the command result as text. Prefer specialized tools such as vscodeOperator_hoverAtPosition and vscodeOperator_completionAt when available.",
         "userDescription": "Execute any VS Code command.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {

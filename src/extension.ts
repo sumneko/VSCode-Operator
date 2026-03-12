@@ -1,5 +1,12 @@
 import * as vscode from "vscode";
-import { ExecuteCommandTool, ReadProblemsTool, RunSupportedCommandTool } from "./features";
+import {
+  ActiveEditorSummaryTool,
+  CompletionAtTool,
+  ExecuteCommandTool,
+  HoverAtPositionTool,
+  HoverTopVisibleTool,
+  ReadProblemsTool
+} from "./features";
 import { LmToolsMcpBridgeServer } from "./mcp/bridgeServer";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -8,7 +15,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     mcpBridge,
     vscode.lm.registerTool("vscodeOperator_readProblems", new ReadProblemsTool()),
-    vscode.lm.registerTool("vscodeOperator_runSupportedCommand", new RunSupportedCommandTool()),
+    vscode.lm.registerTool("vscodeOperator_activeEditorSummary", new ActiveEditorSummaryTool()),
+    vscode.lm.registerTool("vscodeOperator_hoverTopVisible", new HoverTopVisibleTool()),
+    vscode.lm.registerTool("vscodeOperator_hoverAtPosition", new HoverAtPositionTool()),
+    vscode.lm.registerTool("vscodeOperator_completionAt", new CompletionAtTool()),
     vscode.lm.registerTool("vscodeOperator_executeCommand", new ExecuteCommandTool()),
     vscode.commands.registerCommand("vscodeOperator.mcpBridge.showStatus", async () => {
       await vscode.window.showInformationMessage(mcpBridge.getStatus());

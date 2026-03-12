@@ -16,7 +16,10 @@ It exposes diagnostics, hover/completion capabilities, and command execution as 
 | Tool | Reference name | Purpose |
 |---|---|---|
 | `vscodeOperator_readProblems` | `readProblems` | Read all diagnostics from the Problems panel |
-| `vscodeOperator_runSupportedCommand` | `runSupportedCommand` | Optimized editor actions: `activeEditorSummary`, `hoverTopVisible`, `hoverAtPosition`, `completionAt` |
+| `vscodeOperator_activeEditorSummary` | `activeEditorSummary` | Get active editor file/language/cursor summary |
+| `vscodeOperator_hoverTopVisible` | `hoverTopVisible` | Get hover info at top visible position |
+| `vscodeOperator_hoverAtPosition` | `hoverAtPosition` | Get hover info at a specific line/column |
+| `vscodeOperator_completionAt` | `completionAt` | Get completion candidates at a specific line/column |
 | `vscodeOperator_executeCommand` | `executeCommand` | Execute any VS Code command by ID with automatic URI deserialization |
 
 ## MCP Bridge

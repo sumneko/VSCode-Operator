@@ -24,6 +24,7 @@ const DEFAULT_INPUT_SCHEMA = {
 };
 
 const TOOLS_RESOURCE_URI = "vscode-operator://tools";
+const TOOL_SCHEMA_RESOURCE_URI = "vscode-operator://tool-schema";
 const USAGE_GUIDE_RESOURCE_URI = "vscode-operator://usage";
 
 const SERVER_INSTRUCTIONS = [
@@ -33,28 +34,32 @@ const SERVER_INSTRUCTIONS = [
   "If tools/list is unavailable in the client workflow, read resource vscode-operator://tools and vscode-operator://usage.",
   "Do not guess tool names. Use exact names returned by tools/list.",
   "Do not guess parameter names. Follow each tool's inputSchema exactly.",
-  "For vscodeOperator_runSupportedCommand, valid position fields are line + column, both 1-based.",
+  "Use dedicated tools for editor context: vscodeOperator_activeEditorSummary, vscodeOperator_hoverTopVisible, vscodeOperator_hoverAtPosition, and vscodeOperator_completionAt.",
   "When fixing code, prefer reading diagnostics via vscodeOperator_readProblems first."
 ].join(" ");
 
 const USAGE_GUIDE_TEXT = [
   "VSCode Operator usage guide:",
   "1) Call tools/list first to discover exact tools and input schema.",
-  "2) Prefer tool calls over guessing API names or editor state.",
-  "3) For diagnostics/fixes, call vscodeOperator_readProblems first.",
-  "4) For hover/type info, call vscodeOperator_runSupportedCommand (hoverAtPosition/hoverTopVisible).",
-  "5) For completion discovery, call vscodeOperator_runSupportedCommand with action=completionAt.",
-  "6) Use vscodeOperator_executeCommand only when no specialized tool fits.",
+  "2) If list output is truncated, read vscode-operator://tools for compact name+description list.",
+  "3) Query parameter schema using vscode-operator://tool-schema?name=<toolName>.",
+  "4) Prefer tool calls over guessing API names or editor state.",
+  "5) For diagnostics/fixes, call vscodeOperator_readProblems first.",
+  "6) For editor summary, call vscodeOperator_activeEditorSummary.",
+  "7) For hover/type info, call vscodeOperator_hoverTopVisible or vscodeOperator_hoverAtPosition.",
+  "8) For completion discovery, call vscodeOperator_completionAt.",
+  "9) Use vscodeOperator_executeCommand only when no specialized tool fits.",
   "",
-  "Parameter hints for vscodeOperator_runSupportedCommand:",
-  "- Common fields: action, line, column, triggerCharacter(optional).",
+  "Parameter hints:",
+  "- vscodeOperator_hoverAtPosition: line, column",
+  "- vscodeOperator_completionAt: line, column, triggerCharacter(optional)",
   "- Position is 1-based.",
   "",
   "Examples:",
-  "- completionAt with column:",
-  "  {\"action\":\"completionAt\",\"line\":1,\"column\":4,\"triggerCharacter\":\".\"}",
-  "- hoverAtPosition:",
-  "  {\"action\":\"hoverAtPosition\",\"line\":42,\"column\":18}"
+  "- vscodeOperator_completionAt:",
+  "  {\"line\":1,\"column\":4,\"triggerCharacter\":\".\"}",
+  "- vscodeOperator_hoverAtPosition:",
+  "  {\"line\":42,\"column\":18}"
 ].join("\n");
 
 type AliasDefinition = {
@@ -105,7 +110,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
   },
   {
     name: "hover",
-    description: "Compatibility alias of vscodeOperator_runSupportedCommand(action=hoverAtPosition).",
+    description: "Compatibility alias of vscodeOperator_hoverAtPosition.",
     inputSchema: {
       type: "object",
       properties: {
@@ -124,9 +129,8 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
         ? input as Record<string, unknown>
         : {};
       return {
-        targetName: "vscodeOperator_runSupportedCommand",
+        targetName: "vscodeOperator_hoverAtPosition",
         targetInput: {
-          action: "hoverAtPosition",
           line: typeof obj.line === "number" ? obj.line : 1,
           column: typeof obj.column === "number" ? obj.column : 1
         }
@@ -135,7 +139,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
   },
   {
     name: "get_hover_info",
-    description: "Compatibility alias of vscodeOperator_runSupportedCommand(action=hoverAtPosition).",
+    description: "Compatibility alias of vscodeOperator_hoverAtPosition.",
     inputSchema: {
       type: "object",
       properties: {
@@ -154,9 +158,8 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
         ? input as Record<string, unknown>
         : {};
       return {
-        targetName: "vscodeOperator_runSupportedCommand",
+        targetName: "vscodeOperator_hoverAtPosition",
         targetInput: {
-          action: "hoverAtPosition",
           line: typeof obj.line === "number" ? obj.line : 1,
           column: typeof obj.column === "number" ? obj.column : 1
         }
@@ -222,6 +225,17 @@ function getExposedTools(): Tool[] {
 
   const aliasTools = ALIAS_DEFINITIONS.map(toAliasTool);
   return [...nativeTools, ...aliasTools];
+}
+
+function getToolSummaryList(): Array<{ name: string; description: string }> {
+  return getExposedTools().map((tool) => ({
+    name: tool.name,
+    description: tool.description ?? ""
+  }));
+}
+
+function getToolSchemaByName(name: string): Tool | undefined {
+  return getExposedTools().find((tool) => tool.name === name);
 }
 
 function tryParseJsonText(text: string): unknown {
@@ -442,8 +456,14 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
         resources: [
           {
             uri: TOOLS_RESOURCE_URI,
-            name: "VSCode Operator Tool Catalog",
-            description: "A JSON document describing tools currently exposed by the VSCode Operator MCP bridge.",
+            name: "VSCode Operator Tool Summary",
+            description: "Compact JSON list of tool names and descriptions.",
+            mimeType: "application/json"
+          },
+          {
+            uri: TOOL_SCHEMA_RESOURCE_URI,
+            name: "VSCode Operator Tool Schema Lookup",
+            description: "Read with ?name=<toolName> to get a single tool's input schema.",
             mimeType: "application/json"
           },
           {
@@ -469,6 +489,60 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
         };
       }
 
+      if (request.params.uri.startsWith(TOOL_SCHEMA_RESOURCE_URI)) {
+        let toolName = "";
+        try {
+          const parsed = new URL(request.params.uri);
+          toolName = parsed.searchParams.get("name") ?? "";
+        } catch {
+          toolName = "";
+        }
+
+        if (!toolName) {
+          return {
+            contents: [
+              {
+                uri: request.params.uri,
+                mimeType: "application/json",
+                text: JSON.stringify({
+                  error: "Missing query parameter 'name'.",
+                  usage: "vscode-operator://tool-schema?name=vscodeOperator_completionAt"
+                }, null, 2)
+              }
+            ]
+          };
+        }
+
+        const tool = getToolSchemaByName(toolName);
+        if (!tool) {
+          return {
+            contents: [
+              {
+                uri: request.params.uri,
+                mimeType: "application/json",
+                text: JSON.stringify({
+                  error: `Tool not found: ${toolName}`
+                }, null, 2)
+              }
+            ]
+          };
+        }
+
+        return {
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "application/json",
+              text: JSON.stringify({
+                name: tool.name,
+                description: tool.description,
+                inputSchema: tool.inputSchema ?? DEFAULT_INPUT_SCHEMA
+              }, null, 2)
+            }
+          ]
+        };
+      }
+
       if (request.params.uri !== TOOLS_RESOURCE_URI) {
         return {
           contents: [
@@ -481,10 +555,11 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
         };
       }
 
-      const tools = getExposedTools();
+      const tools = getToolSummaryList();
       const payload = {
         endpoint: this.getEndpointUrl(),
         updatedAt: new Date().toISOString(),
+        usage: "Use vscode-operator://tool-schema?name=<toolName> to query a tool input schema.",
         tools
       };
 
