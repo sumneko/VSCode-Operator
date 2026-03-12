@@ -8,7 +8,7 @@ on:
       - '*'
 
 env:
-  VSIX_NAME: codepilot-${{ github.sha }}.vsix
+  VSIX_NAME: vscode-operator-${{ github.sha }}.vsix
 
 jobs:
   build:

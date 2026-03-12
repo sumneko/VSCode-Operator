@@ -163,7 +163,7 @@ function buildInputValidationError(action: SupportedAction, details: string): st
   return [
     `Invalid input for ${action}: ${details}`,
     "Use exact parameter names from tools/list inputSchema.",
-    "If unsure, read resource codepilot://usage."
+    "If unsure, read resource vscode-operator://usage."
   ].join(" ");
 }
 

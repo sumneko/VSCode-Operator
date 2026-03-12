@@ -23,40 +23,38 @@ const DEFAULT_INPUT_SCHEMA = {
   properties: {}
 };
 
-const TOOLS_RESOURCE_URI = "codepilot://tools";
-const USAGE_GUIDE_RESOURCE_URI = "codepilot://usage";
+const TOOLS_RESOURCE_URI = "vscode-operator://tools";
+const USAGE_GUIDE_RESOURCE_URI = "vscode-operator://usage";
 
 const SERVER_INSTRUCTIONS = [
-  "You are connected to CodePilot, a VS Code MCP bridge.",
+  "You are connected to VSCode Operator, a VS Code MCP bridge.",
   "Always prefer MCP tool calls over assumptions when editor state or APIs might matter.",
   "Before calling any tool, call tools/list to discover exact tool names and schemas.",
-  "If tools/list is unavailable in the client workflow, read resource codepilot://tools and codepilot://usage.",
+  "If tools/list is unavailable in the client workflow, read resource vscode-operator://tools and vscode-operator://usage.",
   "Do not guess tool names. Use exact names returned by tools/list.",
   "Do not guess parameter names. Follow each tool's inputSchema exactly.",
-  "For codepilot_runSupportedCommand, valid position fields are line + column (or line + character alias), both 1-based.",
-  "When fixing code, prefer reading diagnostics via codepilot_readProblems first."
+  "For vscodeOperator_runSupportedCommand, valid position fields are line + column, both 1-based.",
+  "When fixing code, prefer reading diagnostics via vscodeOperator_readProblems first."
 ].join(" ");
 
 const USAGE_GUIDE_TEXT = [
-  "CodePilot usage guide:",
+  "VSCode Operator usage guide:",
   "1) Call tools/list first to discover exact tools and input schema.",
   "2) Prefer tool calls over guessing API names or editor state.",
-  "3) For diagnostics/fixes, call codepilot_readProblems first.",
-  "4) For hover/type info, call codepilot_runSupportedCommand (hoverAtPosition/hoverTopVisible).",
-  "5) For completion discovery, call codepilot_runSupportedCommand with action=completionAt.",
-  "6) Use codepilot_executeCommand only when no specialized tool fits.",
+  "3) For diagnostics/fixes, call vscodeOperator_readProblems first.",
+  "4) For hover/type info, call vscodeOperator_runSupportedCommand (hoverAtPosition/hoverTopVisible).",
+  "5) For completion discovery, call vscodeOperator_runSupportedCommand with action=completionAt.",
+  "6) Use vscodeOperator_executeCommand only when no specialized tool fits.",
   "",
-  "Parameter hints for codepilot_runSupportedCommand:",
-  "- Common fields: action, filePath(optional), line, column, character(alias of column), triggerCharacter(optional).",
+  "Parameter hints for vscodeOperator_runSupportedCommand:",
+  "- Common fields: action, line, column, triggerCharacter(optional).",
   "- Position is 1-based.",
   "",
   "Examples:",
   "- completionAt with column:",
-  "  {\"action\":\"completionAt\",\"filePath\":\"C:/repo/1.lua\",\"line\":1,\"column\":4,\"triggerCharacter\":\".\"}",
-  "- completionAt with character alias:",
-  "  {\"action\":\"completionAt\",\"filePath\":\"C:/repo/1.lua\",\"line\":1,\"character\":4,\"triggerCharacter\":\".\"}",
+  "  {\"action\":\"completionAt\",\"line\":1,\"column\":4,\"triggerCharacter\":\".\"}",
   "- hoverAtPosition:",
-  "  {\"action\":\"hoverAtPosition\",\"filePath\":\"C:/repo/main.ts\",\"line\":42,\"column\":18}"
+  "  {\"action\":\"hoverAtPosition\",\"line\":42,\"column\":18}"
 ].join("\n");
 
 type AliasDefinition = {
@@ -69,7 +67,7 @@ type AliasDefinition = {
 const ALIAS_DEFINITIONS: AliasDefinition[] = [
   {
     name: "get_problems",
-    description: "Compatibility alias of codepilot_readProblems. Reads diagnostics from VS Code Problems panel.",
+    description: "Compatibility alias of vscodeOperator_readProblems. Reads diagnostics from VS Code Problems panel.",
     inputSchema: {
       type: "object",
       properties: {
@@ -80,7 +78,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
       }
     },
     toInvokeInput: (input) => ({
-      targetName: "codepilot_readProblems",
+      targetName: "vscodeOperator_readProblems",
       targetInput: (input !== null && typeof input === "object" && !Array.isArray(input))
         ? (input as Record<string, unknown>)
         : {}
@@ -88,7 +86,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
   },
   {
     name: "get_diagnostics",
-    description: "Compatibility alias of codepilot_readProblems. Reads diagnostics from VS Code Problems panel.",
+    description: "Compatibility alias of vscodeOperator_readProblems. Reads diagnostics from VS Code Problems panel.",
     inputSchema: {
       type: "object",
       properties: {
@@ -99,7 +97,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
       }
     },
     toInvokeInput: (input) => ({
-      targetName: "codepilot_readProblems",
+      targetName: "vscodeOperator_readProblems",
       targetInput: (input !== null && typeof input === "object" && !Array.isArray(input))
         ? (input as Record<string, unknown>)
         : {}
@@ -107,7 +105,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
   },
   {
     name: "hover",
-    description: "Compatibility alias of codepilot_runSupportedCommand(action=hoverAtPosition).",
+    description: "Compatibility alias of vscodeOperator_runSupportedCommand(action=hoverAtPosition).",
     inputSchema: {
       type: "object",
       properties: {
@@ -126,7 +124,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
         ? input as Record<string, unknown>
         : {};
       return {
-        targetName: "codepilot_runSupportedCommand",
+        targetName: "vscodeOperator_runSupportedCommand",
         targetInput: {
           action: "hoverAtPosition",
           line: typeof obj.line === "number" ? obj.line : 1,
@@ -137,7 +135,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
   },
   {
     name: "get_hover_info",
-    description: "Compatibility alias of codepilot_runSupportedCommand(action=hoverAtPosition).",
+    description: "Compatibility alias of vscodeOperator_runSupportedCommand(action=hoverAtPosition).",
     inputSchema: {
       type: "object",
       properties: {
@@ -156,7 +154,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
         ? input as Record<string, unknown>
         : {};
       return {
-        targetName: "codepilot_runSupportedCommand",
+        targetName: "vscodeOperator_runSupportedCommand",
         targetInput: {
           action: "hoverAtPosition",
           line: typeof obj.line === "number" ? obj.line : 1,
@@ -186,7 +184,7 @@ function normalizePath(value: string): string {
 }
 
 function getConfig(): BridgeConfig {
-  const config = vscode.workspace.getConfiguration("codepilot.mcpBridge");
+  const config = vscode.workspace.getConfiguration("vscodeOperator.mcpBridge");
   return {
     enabled: config.get<boolean>("enabled", true),
     host: config.get<string>("host", "127.0.0.1"),
@@ -201,7 +199,7 @@ function toMcpTool(info: vscode.LanguageModelToolInformation): Tool {
     description: info.description,
     inputSchema: (info.inputSchema as Tool["inputSchema"]) ?? DEFAULT_INPUT_SCHEMA,
     _meta: info.tags.length > 0
-      ? { "codepilot/vscodeTags": [...info.tags] }
+      ? { "vscodeOperator/vscodeTags": [...info.tags] }
       : undefined
   };
 }
@@ -212,7 +210,7 @@ function toAliasTool(alias: AliasDefinition): Tool {
     description: alias.description,
     inputSchema: alias.inputSchema,
     _meta: {
-      "codepilot/aliasOf": true
+      "vscodeOperator/aliasOf": true
     }
   };
 }
@@ -297,7 +295,7 @@ function toToolResultContent(result: vscode.LanguageModelToolResult): CallToolRe
 }
 
 export class LmToolsMcpBridgeServer implements vscode.Disposable {
-  private readonly output = vscode.window.createOutputChannel("CodePilot MCP Bridge");
+  private readonly output = vscode.window.createOutputChannel("VSCode Operator MCP Bridge");
   private httpServer: HttpServer | undefined;
   private currentConfig = getConfig();
   private currentPort: number | undefined;
@@ -323,7 +321,7 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
     server.on("error", (error) => {
       this.lastError = error instanceof Error ? error.message : String(error);
       this.appendLine(`HTTP server error: ${this.lastError}`);
-      void vscode.window.showWarningMessage(`CodePilot MCP bridge failed: ${this.lastError}`);
+      void vscode.window.showWarningMessage(`VSCode Operator MCP bridge failed: ${this.lastError}`);
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -387,16 +385,16 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
 
   getStatus(): string {
     if (!this.currentConfig.enabled) {
-      return "CodePilot MCP bridge is disabled.";
+      return "VSCode Operator MCP bridge is disabled.";
     }
 
     if (!this.httpServer || this.currentPort === undefined) {
       return this.lastError
-        ? `CodePilot MCP bridge is not running. Last error: ${this.lastError}`
-        : "CodePilot MCP bridge is not running.";
+        ? `VSCode Operator MCP bridge is not running. Last error: ${this.lastError}`
+        : "VSCode Operator MCP bridge is not running.";
     }
 
-    return `CodePilot MCP bridge is running at ${this.getEndpointUrl()}`;
+    return `VSCode Operator MCP bridge is running at ${this.getEndpointUrl()}`;
   }
 
   getEndpointUrl(): string {
@@ -423,7 +421,7 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
   private createProtocolServer(): Server {
     const server = new Server(
       {
-        name: "codepilot-vscode-tools",
+        name: "vscode-operator-vscode-tools",
         version: "0.0.1"
       },
       {
@@ -444,13 +442,13 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
         resources: [
           {
             uri: TOOLS_RESOURCE_URI,
-            name: "CodePilot Tool Catalog",
-            description: "A JSON document describing tools currently exposed by the CodePilot MCP bridge.",
+            name: "VSCode Operator Tool Catalog",
+            description: "A JSON document describing tools currently exposed by the VSCode Operator MCP bridge.",
             mimeType: "application/json"
           },
           {
             uri: USAGE_GUIDE_RESOURCE_URI,
-            name: "CodePilot Usage Guide",
+            name: "VSCode Operator Usage Guide",
             description: "Guidance for models to prefer MCP tools and discovery flow.",
             mimeType: "text/plain"
           }

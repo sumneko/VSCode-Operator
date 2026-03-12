@@ -7,18 +7,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     mcpBridge,
-    vscode.lm.registerTool("codepilot_readProblems", new ReadProblemsTool()),
-    vscode.lm.registerTool("codepilot_runSupportedCommand", new RunSupportedCommandTool()),
-    vscode.lm.registerTool("codepilot_executeCommand", new ExecuteCommandTool()),
-    vscode.commands.registerCommand("codepilot.mcpBridge.showStatus", async () => {
+    vscode.lm.registerTool("vscodeOperator_readProblems", new ReadProblemsTool()),
+    vscode.lm.registerTool("vscodeOperator_runSupportedCommand", new RunSupportedCommandTool()),
+    vscode.lm.registerTool("vscodeOperator_executeCommand", new ExecuteCommandTool()),
+    vscode.commands.registerCommand("vscodeOperator.mcpBridge.showStatus", async () => {
       await vscode.window.showInformationMessage(mcpBridge.getStatus());
     }),
-    vscode.commands.registerCommand("codepilot.mcpBridge.restart", async () => {
+    vscode.commands.registerCommand("vscodeOperator.mcpBridge.restart", async () => {
       await mcpBridge.restart();
       await vscode.window.showInformationMessage(mcpBridge.getStatus());
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("codepilot.mcpBridge")) {
+      if (event.affectsConfiguration("vscodeOperator.mcpBridge")) {
         void mcpBridge.reloadFromConfiguration();
       }
     })

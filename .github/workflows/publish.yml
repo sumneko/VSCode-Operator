@@ -9,7 +9,7 @@ on:
       - '*'
 
 env:
-  VSIX_NAME: codepilot-${{ github.ref_name }}.vsix
+  VSIX_NAME: vscode-operator-${{ github.ref_name }}.vsix
 
 jobs:
   publish:

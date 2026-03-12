@@ -8,4 +8,4 @@ src/**
 .eslintrc.cjs
 tsconfig.json
 package-lock.json
-codepilot-*.vsix
+vscode-operator-*.vsix

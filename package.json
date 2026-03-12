@@ -1,8 +1,8 @@
 {
-  "name": "codepilot",
-  "displayName": "CodePilot",
+  "name": "vscode-operator",
+  "displayName": "VSCode Operator",
   "version": "1.0.0",
-  "description": "Expose VSCode editor tools and diagnostics to AI agents via Language Model Tools and a local MCP bridge.",
+  "description": "AI that operates VS Code like a real developer through Language Model Tools and a local MCP bridge.",
   "main": "./dist/extension.js",
   "scripts": {
     "compile": "tsc -p ./",
@@ -22,34 +22,34 @@
   "contributes": {
     "commands": [
       {
-        "command": "codepilot.mcpBridge.showStatus",
-        "title": "CodePilot: Show MCP Bridge Status"
+        "command": "vscodeOperator.mcpBridge.showStatus",
+        "title": "VSCode Operator: Show MCP Bridge Status"
       },
       {
-        "command": "codepilot.mcpBridge.restart",
-        "title": "CodePilot: Restart MCP Bridge"
+        "command": "vscodeOperator.mcpBridge.restart",
+        "title": "VSCode Operator: Restart MCP Bridge"
       }
     ],
     "configuration": {
-      "title": "CodePilot",
+      "title": "VSCode Operator",
       "properties": {
-        "codepilot.mcpBridge.enabled": {
+        "vscodeOperator.mcpBridge.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable the local MCP bridge that exposes VS Code language model tools to external MCP clients."
         },
-        "codepilot.mcpBridge.host": {
+        "vscodeOperator.mcpBridge.host": {
           "type": "string",
           "default": "127.0.0.1",
           "description": "Host interface for the local MCP bridge. Keep this on 127.0.0.1 unless you intentionally want remote access."
         },
-        "codepilot.mcpBridge.port": {
+        "vscodeOperator.mcpBridge.port": {
           "type": "number",
           "default": 19191,
           "minimum": 0,
           "description": "TCP port for the local MCP bridge. Set to 0 to let the OS choose a free port."
         },
-        "codepilot.mcpBridge.path": {
+        "vscodeOperator.mcpBridge.path": {
           "type": "string",
           "default": "/mcp",
           "description": "HTTP path for the MCP endpoint exposed by the local bridge."
@@ -58,7 +58,7 @@
     },
     "languageModelTools": [
       {
-        "name": "codepilot_readProblems",
+        "name": "vscodeOperator_readProblems",
         "tags": [
           "vscode",
           "problems",
@@ -81,7 +81,7 @@
         }
       },
       {
-        "name": "codepilot_runSupportedCommand",
+        "name": "vscodeOperator_runSupportedCommand",
         "tags": [
           "vscode",
           "command",
@@ -89,7 +89,7 @@
         ],
         "toolReferenceName": "runSupportedCommand",
         "displayName": "Run Supported Command",
-        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary to get the currently open file, language, and cursor. Use action=hoverTopVisible for hover info at the top visible line. Use action=hoverAtPosition with line+column (1-based) for hover info at a specific position. Use action=completionAt with line+column (and optional triggerCharacter) to get LSP completions at a position — call this ONCE per unfamiliar type at the start of a coding task to discover correct member names, rather than before every individual method call. Always follow tools/list inputSchema exactly; unsupported fields are rejected. Prefer this tool over codepilot_executeCommand for these actions.",
+        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary to get the currently open file, language, and cursor. Use action=hoverTopVisible for hover info at the top visible line. Use action=hoverAtPosition with line+column (1-based) for hover info at a specific position. Use action=completionAt with line+column (and optional triggerCharacter) to get LSP completions at a position — call this ONCE per unfamiliar type at the start of a coding task to discover correct member names, rather than before every individual method call. Always follow tools/list inputSchema exactly; unsupported fields are rejected. Prefer this tool over vscodeOperator_executeCommand for these actions.",
         "userDescription": "Run optimized VS Code command actions.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -124,7 +124,7 @@
         }
       },
       {
-        "name": "codepilot_executeCommand",
+        "name": "vscodeOperator_executeCommand",
         "tags": [
           "vscode",
           "command",
@@ -132,7 +132,7 @@
         ],
         "toolReferenceName": "executeCommand",
         "displayName": "Execute VS Code Command",
-        "modelDescription": "Call this tool to execute any VS Code command by its command id when no specialized tool covers the need. Examples: open a file (vscode.open), show a definition (vscode.executeDefinitionProvider), trigger a code action (editor.action.quickFix), or inspect symbol references. Pass arguments as the args array or as argsJson (JSON-encoded array string). The tool returns the command result as text. Use codepilot_runSupportedCommand first for hoverTopVisible and activeEditorSummary.",
+        "modelDescription": "Call this tool to execute any VS Code command by its command id when no specialized tool covers the need. Examples: open a file (vscode.open), show a definition (vscode.executeDefinitionProvider), trigger a code action (editor.action.quickFix), or inspect symbol references. Pass arguments as the args array or as argsJson (JSON-encoded array string). The tool returns the command result as text. Use vscodeOperator_runSupportedCommand first for hoverTopVisible and activeEditorSummary.",
         "userDescription": "Execute any VS Code command.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -167,7 +167,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/sumneko/codepilot.git"
+    "url": "https://github.com/sumneko/VSCode-Operator.git"
   },
   "author": "",
   "license": "MIT",
