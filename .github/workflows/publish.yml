@@ -17,6 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure Git identity
+        shell: bash
+        run: |
+          git config user.email "sumneko.hotmail.com"
+          git config user.name "最萌小汐（宇宙创生）"
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
