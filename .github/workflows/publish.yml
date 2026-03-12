@@ -36,7 +36,8 @@ jobs:
       - name: Pack vsix
         shell: bash
         run: |
-          npx @vscode/vsce package -o "${{ env.VSIX_NAME }}" \
+          VERSION="${GITHUB_REF_NAME#v}"
+          npx @vscode/vsce package "$VERSION" -o "${{ env.VSIX_NAME }}" \
             --baseContentUrl "https://github.com/${{ github.repository }}/blob/${{ github.sha }}/" \
             --baseImagesUrl "https://github.com/${{ github.repository }}/raw/${{ github.sha }}/"
 
@@ -51,6 +52,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
+          name: VSCode Operator ${{ github.ref_name }}
           generate_release_notes: true
           files: |
             ${{ env.VSIX_NAME }}
