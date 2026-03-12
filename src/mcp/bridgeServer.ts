@@ -31,6 +31,8 @@ const SERVER_INSTRUCTIONS = [
   "You are connected to VSCode Operator, a VS Code MCP bridge.",
   "Always prefer MCP tool calls over assumptions when editor state or APIs might matter.",
   "Before calling any tool, call tools/list to discover exact tool names and schemas.",
+  "workspacePath is not required for generic MCP methods like initialize/tools/list/resources/list.",
+  "When multiple workspaces exist, provide workspacePath for workspace-specific VS Code requests (for example tool arguments or resource URI query).",
   "If tools/list is unavailable in the client workflow, read resource vscode-operator://tools and vscode-operator://usage.",
   "Do not guess tool names. Use exact names returned by tools/list.",
   "Do not guess parameter names. Follow each tool's inputSchema exactly.",
@@ -49,6 +51,8 @@ const USAGE_GUIDE_TEXT = [
   "7) For hover/type info, call vscodeOperator_hoverTopVisible or vscodeOperator_hoverAtPosition.",
   "8) For completion discovery, call vscodeOperator_completionAt.",
   "9) Use vscodeOperator_executeCommand only when no specialized tool fits.",
+  "10) For generic MCP calls (initialize/tools/list/resources/list), workspacePath is optional.",
+  "11) For workspace-specific requests in multi-workspace mode, include workspacePath in tool arguments or in resource URI query (e.g. vscode-operator://tools?workspacePath=<abs path>).",
   "",
   "Parameter hints:",
   "- vscodeOperator_hoverAtPosition: line, column",
@@ -343,9 +347,13 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
     });
 
     server.on("error", (error) => {
+      const err = error as NodeJS.ErrnoException;
       this.lastError = error instanceof Error ? error.message : String(error);
       this.appendLine(`HTTP server error: ${this.lastError}`);
-      void vscode.window.showWarningMessage(`VSCode Operator MCP bridge failed: ${this.lastError}`);
+      // EADDRINUSE is expected while probing/competing for ports in multi-instance mode.
+      if (err.code !== "EADDRINUSE") {
+        void vscode.window.showWarningMessage(`VSCode Operator MCP bridge failed: ${this.lastError}`);
+      }
     });
 
     // Try to find an available port starting from proxyPort+1
@@ -663,7 +671,7 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
         };
       }
 
-      if (request.params.uri !== TOOLS_RESOURCE_URI) {
+      if (!request.params.uri.startsWith(TOOLS_RESOURCE_URI)) {
         return {
           contents: [
             {
@@ -686,7 +694,7 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
       return {
         contents: [
           {
-            uri: TOOLS_RESOURCE_URI,
+            uri: request.params.uri,
             mimeType: "application/json",
             text: JSON.stringify(payload, null, 2)
           }

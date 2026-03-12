@@ -1,6 +1,7 @@
 import type { IncomingMessage, Server as HttpServer, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 export interface BridgeRegistration {
@@ -49,6 +50,71 @@ export class McpProxyServer implements vscode.Disposable {
     }
   }
 
+  private normalizeWorkspacePathForCompare(value: string): string {
+    const trimmed = decodeURIComponent(value).trim();
+    if (/^[a-zA-Z]:/.test(trimmed)) {
+      // Windows path compare: case-insensitive + slash-insensitive
+      return path.win32.normalize(trimmed.replace(/\//g, "\\")).toLowerCase();
+    }
+
+    return path.posix.normalize(trimmed.replace(/\\/g, "/"));
+  }
+
+  private findBridgeByWorkspacePath(workspacePath: string): BridgeRegistration | undefined {
+    const direct = this.bridges.get(workspacePath);
+    if (direct) {
+      return direct;
+    }
+
+    const normalizedInput = this.normalizeWorkspacePathForCompare(workspacePath);
+    for (const bridge of this.bridges.values()) {
+      if (this.normalizeWorkspacePathForCompare(bridge.workspacePath) === normalizedInput) {
+        return bridge;
+      }
+    }
+
+    return undefined;
+  }
+
+  private extractWorkspacePathFromPayload(parsed: Record<string, unknown>, workspacePathFromUrl: string | null): string | null {
+    const params = parsed.params as Record<string, unknown> | undefined;
+    const args = params?.arguments as Record<string, unknown> | undefined;
+
+    const fromFields =
+      workspacePathFromUrl ??
+      (typeof args?.workspacePath === "string" ? args.workspacePath : null) ??
+      (typeof params?.workspacePath === "string" ? params.workspacePath : null) ??
+      (typeof parsed.workspacePath === "string" ? parsed.workspacePath : null);
+
+    if (fromFields) {
+      return fromFields;
+    }
+
+    // Resource reads often put workspacePath inside params.uri query string.
+    const uriRaw = typeof params?.uri === "string" ? params.uri : null;
+    if (uriRaw) {
+      try {
+        const uri = new URL(uriRaw);
+        const fromUri = uri.searchParams.get("workspacePath");
+        if (fromUri) {
+          return fromUri;
+        }
+      } catch {
+        // Ignore invalid URIs and continue fallback.
+      }
+    }
+
+    return null;
+  }
+
+  private isGenericMcpMethod(method: string): boolean {
+    return method === "initialize"
+      || method === "notifications/initialized"
+      || method === "tools/list"
+      || method === "resources/list"
+      || method === "prompts/list";
+  }
+
   async start(): Promise<void> {
     if (this.httpServer) {
       return;
@@ -59,9 +125,13 @@ export class McpProxyServer implements vscode.Disposable {
     });
 
     server.on("error", (error) => {
+      const err = error as NodeJS.ErrnoException;
       this.lastError = error instanceof Error ? error.message : String(error);
       this.appendLine(`HTTP server error: ${this.lastError}`);
-      void vscode.window.showWarningMessage(`VSCode Operator Proxy failed: ${this.lastError}`);
+      // EADDRINUSE is expected in multi-instance mode; keep it as log only.
+      if (err.code !== "EADDRINUSE") {
+        void vscode.window.showWarningMessage(`VSCode Operator Proxy failed: ${this.lastError}`);
+      }
     });
 
     const proxyPort = vscode.workspace.getConfiguration("vscodeOperator.mcpBridge").get<number>("port", 19191);
@@ -241,13 +311,9 @@ export class McpProxyServer implements vscode.Disposable {
 
             // 2. workspacePath-based routing (URL param preferred, then body)
             if (!bridge) {
-              const workspacePath: string | null =
-                workspacePathFromUrl ??
-                parsed.params?.arguments?.workspacePath ??
-                parsed.params?.workspacePath ??
-                null;
+              const workspacePath = this.extractWorkspacePathFromPayload(parsed as Record<string, unknown>, workspacePathFromUrl);
               if (workspacePath) {
-                bridge = this.bridges.get(workspacePath);
+                bridge = this.findBridgeByWorkspacePath(workspacePath);
                 if (!bridge) {
                   this.appendLine(`[${requestId}] Route failed: workspace not registered ${workspacePath}`);
                   res.writeHead(404, { "Content-Type": "application/json" });
@@ -258,7 +324,7 @@ export class McpProxyServer implements vscode.Disposable {
               }
             }
 
-            // 3. Fallback: only one bridge open → auto-route
+            // 3. Fallback when workspace is still unspecified.
             if (!bridge) {
               if (this.bridges.size === 1) {
                 bridge = [...this.bridges.values()][0];
@@ -268,11 +334,15 @@ export class McpProxyServer implements vscode.Disposable {
                 res.writeHead(503, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ error: "No VS Code bridge is connected yet. Open a workspace in VS Code first." }));
                 return;
+              } else if (this.isGenericMcpMethod(rpcMethod)) {
+                // Generic MCP methods are workspace-agnostic; pick a deterministic default bridge.
+                bridge = [...this.bridges.values()].sort((a, b) => a.workspacePath.localeCompare(b.workspacePath))[0];
+                this.appendLine(`[${requestId}] Route by multi-bridge generic-method fallback (${rpcMethod}) -> ${bridge.workspacePath}`);
               } else {
                 this.appendLine(`[${requestId}] Route failed: multi-bridge requires workspacePath`);
                 res.writeHead(400, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({
-                  error: "Multiple workspaces are open. Specify workspacePath as a URL query parameter: /mcp?workspacePath=/path/to/workspace"
+                  error: "Multiple workspaces are open. Provide workspacePath in VS Code tool request arguments / resource URI query, or in /mcp?workspacePath=/path/to/workspace (recommended for initialize)."
                 }));
                 return;
               }
