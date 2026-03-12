@@ -1,8 +1,8 @@
 {
   "name": "codepilot",
-  "displayName": "CodePilot VS Code Assistant",
-  "version": "0.0.1",
-  "description": "A VS Code extension that exposes native tools for Copilot in the editor context.",
+  "displayName": "CodePilot",
+  "version": "1.0.0",
+  "description": "Expose VSCode editor tools and diagnostics to AI agents via Language Model Tools and a local MCP bridge.",
   "main": "./dist/extension.js",
   "scripts": {
     "compile": "tsc -p ./",

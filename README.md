@@ -4,6 +4,11 @@ A TypeScript VS Code extension that exposes native editor context as Language Mo
 
 It also starts a local MCP bridge inside the Extension Host so external MCP clients can discover and call the currently registered VS Code language model tools.
 
+## Simple Intro (For Marketplace)
+
+CodePilot connects AI assistants to real VS Code context.
+It exposes diagnostics, hover/completion capabilities, and command execution as tools, and provides a built-in local MCP bridge so external MCP clients can discover and call the same toolset in your live editor session.
+
 > **For detailed architecture and design decisions, see [ARCHITECTURE.md](ARCHITECTURE.md).**
 
 ## Tools
@@ -21,6 +26,16 @@ It also starts a local MCP bridge inside the Extension Host so external MCP clie
 - Purpose: expose `vscode.lm.tools` over MCP `tools/list` and forward `tools/call` to `vscode.lm.invokeTool`
 - Commands: `CodePilot: Show MCP Bridge Status`, `CodePilot: Restart MCP Bridge`
 - Settings: `codepilot.mcpBridge.enabled`, `codepilot.mcpBridge.host`, `codepilot.mcpBridge.port`, `codepilot.mcpBridge.path`
+
+### Customize MCP Port
+
+Default MCP port is `19191`. Users can change it in settings.
+
+```json
+{
+	"codepilot.mcpBridge.port": 20191
+}
+```
 
 ## Development
 
