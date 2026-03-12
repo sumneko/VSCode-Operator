@@ -2,6 +2,8 @@ import type { IncomingMessage, Server as HttpServer, ServerResponse } from "node
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
+// We intentionally use the low-level Server API because this bridge dynamically
+// wires tools/resources handlers from the live VS Code session on each request.
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
