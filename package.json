@@ -20,6 +20,42 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "commands": [
+      {
+        "command": "codepilot.mcpBridge.showStatus",
+        "title": "CodePilot: Show MCP Bridge Status"
+      },
+      {
+        "command": "codepilot.mcpBridge.restart",
+        "title": "CodePilot: Restart MCP Bridge"
+      }
+    ],
+    "configuration": {
+      "title": "CodePilot",
+      "properties": {
+        "codepilot.mcpBridge.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the local MCP bridge that exposes VS Code language model tools to external MCP clients."
+        },
+        "codepilot.mcpBridge.host": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Host interface for the local MCP bridge. Keep this on 127.0.0.1 unless you intentionally want remote access."
+        },
+        "codepilot.mcpBridge.port": {
+          "type": "number",
+          "default": 19191,
+          "minimum": 0,
+          "description": "TCP port for the local MCP bridge. Set to 0 to let the OS choose a free port."
+        },
+        "codepilot.mcpBridge.path": {
+          "type": "string",
+          "default": "/mcp",
+          "description": "HTTP path for the MCP endpoint exposed by the local bridge."
+        }
+      }
+    },
     "languageModelTools": [
       {
         "name": "codepilot_readProblems",
@@ -124,6 +160,7 @@
     ]
   },
   "keywords": [
+    "mcp",
     "vscode",
     "copilot",
     "extension"
@@ -140,5 +177,7 @@
     "eslint": "^10.0.3",
     "typescript": "^5.9.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  }
 }
