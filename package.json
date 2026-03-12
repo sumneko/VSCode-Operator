@@ -89,7 +89,7 @@
         ],
         "toolReferenceName": "runSupportedCommand",
         "displayName": "Run Supported Command",
-        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary to get the currently open file, language, and cursor. Use action=hoverTopVisible for hover info at the top visible line. Use action=hoverAtPosition with line+column (1-based) for hover info at a specific position. Use action=completionAt with line+column (and optional triggerCharacter) to get LSP completions at a position — call this ONCE per unfamiliar type at the start of a coding task to discover correct member names, rather than before every individual method call. Prefer this tool over codepilot_executeCommand for these actions.",
+        "modelDescription": "Call this tool to get rich editor context with human-readable output. Use action=activeEditorSummary to get the currently open file, language, and cursor. Use action=hoverTopVisible for hover info at the top visible line. Use action=hoverAtPosition with line+column (1-based) for hover info at a specific position. Use action=completionAt with line+column (and optional triggerCharacter) to get LSP completions at a position — call this ONCE per unfamiliar type at the start of a coding task to discover correct member names, rather than before every individual method call. Always follow tools/list inputSchema exactly; unsupported fields are rejected. Prefer this tool over codepilot_executeCommand for these actions.",
         "userDescription": "Run optimized VS Code command actions.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {

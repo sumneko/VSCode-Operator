@@ -24,6 +24,40 @@ const DEFAULT_INPUT_SCHEMA = {
 };
 
 const TOOLS_RESOURCE_URI = "codepilot://tools";
+const USAGE_GUIDE_RESOURCE_URI = "codepilot://usage";
+
+const SERVER_INSTRUCTIONS = [
+  "You are connected to CodePilot, a VS Code MCP bridge.",
+  "Always prefer MCP tool calls over assumptions when editor state or APIs might matter.",
+  "Before calling any tool, call tools/list to discover exact tool names and schemas.",
+  "If tools/list is unavailable in the client workflow, read resource codepilot://tools and codepilot://usage.",
+  "Do not guess tool names. Use exact names returned by tools/list.",
+  "Do not guess parameter names. Follow each tool's inputSchema exactly.",
+  "For codepilot_runSupportedCommand, valid position fields are line + column (or line + character alias), both 1-based.",
+  "When fixing code, prefer reading diagnostics via codepilot_readProblems first."
+].join(" ");
+
+const USAGE_GUIDE_TEXT = [
+  "CodePilot usage guide:",
+  "1) Call tools/list first to discover exact tools and input schema.",
+  "2) Prefer tool calls over guessing API names or editor state.",
+  "3) For diagnostics/fixes, call codepilot_readProblems first.",
+  "4) For hover/type info, call codepilot_runSupportedCommand (hoverAtPosition/hoverTopVisible).",
+  "5) For completion discovery, call codepilot_runSupportedCommand with action=completionAt.",
+  "6) Use codepilot_executeCommand only when no specialized tool fits.",
+  "",
+  "Parameter hints for codepilot_runSupportedCommand:",
+  "- Common fields: action, filePath(optional), line, column, character(alias of column), triggerCharacter(optional).",
+  "- Position is 1-based.",
+  "",
+  "Examples:",
+  "- completionAt with column:",
+  "  {\"action\":\"completionAt\",\"filePath\":\"C:/repo/1.lua\",\"line\":1,\"column\":4,\"triggerCharacter\":\".\"}",
+  "- completionAt with character alias:",
+  "  {\"action\":\"completionAt\",\"filePath\":\"C:/repo/1.lua\",\"line\":1,\"character\":4,\"triggerCharacter\":\".\"}",
+  "- hoverAtPosition:",
+  "  {\"action\":\"hoverAtPosition\",\"filePath\":\"C:/repo/main.ts\",\"line\":42,\"column\":18}"
+].join("\n");
 
 type AliasDefinition = {
   name: string;
@@ -397,11 +431,7 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
           tools: {},
           resources: {}
         },
-        instructions: [
-          "This server exposes VS Code language model tools that are currently registered inside the editor.",
-          "Use tools/list to discover what the current VS Code session can do.",
-          "Use tools/call to invoke a VS Code tool by its exact name with JSON arguments."
-        ].join(" ")
+        instructions: SERVER_INSTRUCTIONS
       }
     );
 
@@ -417,12 +447,30 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
             name: "CodePilot Tool Catalog",
             description: "A JSON document describing tools currently exposed by the CodePilot MCP bridge.",
             mimeType: "application/json"
+          },
+          {
+            uri: USAGE_GUIDE_RESOURCE_URI,
+            name: "CodePilot Usage Guide",
+            description: "Guidance for models to prefer MCP tools and discovery flow.",
+            mimeType: "text/plain"
           }
         ]
       };
     });
 
     server.setRequestHandler(ReadResourceRequestSchema, async (request): Promise<ReadResourceResult> => {
+      if (request.params.uri === USAGE_GUIDE_RESOURCE_URI) {
+        return {
+          contents: [
+            {
+              uri: USAGE_GUIDE_RESOURCE_URI,
+              mimeType: "text/plain",
+              text: USAGE_GUIDE_TEXT
+            }
+          ]
+        };
+      }
+
       if (request.params.uri !== TOOLS_RESOURCE_URI) {
         return {
           contents: [
