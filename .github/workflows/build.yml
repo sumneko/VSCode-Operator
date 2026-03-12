@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '*'
+
+env:
+  VSIX_NAME: codepilot-${{ github.sha }}.vsix
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Compile Client
+        shell: bash
+        run: |
+          npm ci
+          npm run compile
+
+      - name: Pack vsix
+        shell: bash
+        run: |
+          npx @vscode/vsce package -o "${{ env.VSIX_NAME }}"
+
+      - name: Upload vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.VSIX_NAME }}
+          path: ${{ env.VSIX_NAME }}

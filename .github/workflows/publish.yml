@@ -1,0 +1,54 @@
+name: publish
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  VSIX_NAME: codepilot-${{ github.ref_name }}.vsix
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Compile Client
+        shell: bash
+        run: |
+          npm ci
+          npm run compile
+
+      - name: Pack vsix
+        shell: bash
+        run: |
+          npx @vscode/vsce package -o "${{ env.VSIX_NAME }}"
+
+      - name: Upload vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.VSIX_NAME }}
+          path: ${{ env.VSIX_NAME }}
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          generate_release_notes: true
+          files: |
+            ${{ env.VSIX_NAME }}
+
+      - name: Publish to VSCode Market
+        shell: bash
+        run: npx @vscode/vsce publish -i "${{ env.VSIX_NAME }}" -p "${{ secrets.VSCE_TOKEN }}"
