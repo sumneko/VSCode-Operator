@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 type ActiveEditorSummaryToolInput = Record<string, never>;
@@ -15,6 +16,10 @@ type CompletionAtToolInput = {
   line?: number;
   /** 1-based column number */
   column?: number;
+  /** Optional file path (absolute, or relative to workspacePath/current workspace) */
+  filePath?: string;
+  /** Optional absolute workspace path used as base for relative filePath */
+  workspacePath?: string;
   /** Optional trigger character (e.g. ":" or ".") */
   triggerCharacter?: string;
 };
@@ -143,6 +148,43 @@ async function resolveTargetDocument(): Promise<vscode.TextDocument | undefined>
   return vscode.window.activeTextEditor?.document;
 }
 
+async function resolveDocumentForCompletionInput(
+  input: CompletionAtToolInput
+): Promise<{ document?: vscode.TextDocument; error?: string }> {
+  const rawFilePath = typeof input.filePath === "string" ? input.filePath.trim() : "";
+  if (rawFilePath.length > 0) {
+    let resolvedPath = rawFilePath;
+
+    if (!path.isAbsolute(rawFilePath)) {
+      const explicitWorkspacePath = typeof input.workspacePath === "string" ? input.workspacePath.trim() : "";
+      const activeWorkspacePath = vscode.window.activeTextEditor
+        ? vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri)?.uri.fsPath
+        : undefined;
+      const defaultWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const basePath = explicitWorkspacePath || activeWorkspacePath || defaultWorkspacePath;
+
+      if (!basePath) {
+        return {
+          error: "filePath is relative, but no workspace is available. Provide an absolute filePath or workspacePath."
+        };
+      }
+
+      resolvedPath = path.resolve(basePath, rawFilePath);
+    }
+
+    try {
+      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(resolvedPath));
+      return { document };
+    } catch (error) {
+      return {
+        error: `Cannot open file for completion: ${resolvedPath}. ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
+  }
+
+  return { document: await resolveTargetDocument() };
+}
+
 function getPosition(document: vscode.TextDocument, input: { line: number; column: number }): vscode.Position {
   const inputLine = input.line! - 1;
   const inputCol = input.column! - 1;
@@ -181,7 +223,9 @@ function validatePositionInput(
   input: Record<string, unknown>,
   allowTriggerCharacter: boolean
 ): string | undefined {
-  const allowed = allowTriggerCharacter ? ["line", "column", "triggerCharacter"] : ["line", "column"];
+  const allowed = allowTriggerCharacter
+    ? ["line", "column", "triggerCharacter", "workspacePath", "filePath"]
+    : ["line", "column", "workspacePath"];
   const unsupportedKeys = getUnsupportedInputKeys(input, allowed);
   if (unsupportedKeys.length > 0) {
     return buildInputValidationError(toolName, `unsupported fields: ${unsupportedKeys.join(", ")}.`);
@@ -200,6 +244,20 @@ function validatePositionInput(
     const triggerCharacter = input["triggerCharacter"];
     if (typeof triggerCharacter !== "string" || triggerCharacter.length === 0) {
       return buildInputValidationError(toolName, "triggerCharacter must be a non-empty string when provided.");
+    }
+  }
+
+  if (input["workspacePath"] !== undefined) {
+    const workspacePath = input["workspacePath"];
+    if (typeof workspacePath !== "string" || workspacePath.trim().length === 0) {
+      return buildInputValidationError(toolName, "workspacePath must be a non-empty string when provided.");
+    }
+  }
+
+  if (allowTriggerCharacter && input["filePath"] !== undefined) {
+    const filePath = input["filePath"];
+    if (typeof filePath !== "string" || filePath.trim().length === 0) {
+      return buildInputValidationError(toolName, "filePath must be a non-empty string when provided.");
     }
   }
 
@@ -349,14 +407,14 @@ export class CompletionAtTool implements vscode.LanguageModelTool<CompletionAtTo
       ]);
     }
 
-    const document = await resolveTargetDocument();
-    if (!document) {
+    const input = options.input as CompletionAtToolInput & { line: number; column: number };
+    const target = await resolveDocumentForCompletionInput(input);
+    if (!target.document) {
       return new vscode.LanguageModelToolResult([
-        new vscode.LanguageModelTextPart("No active text editor.")
+        new vscode.LanguageModelTextPart(target.error ?? "No active text editor.")
       ]);
     }
-
-    const input = options.input as CompletionAtToolInput & { line: number; column: number };
+    const document = target.document;
     const position = getPosition(document, input);
 
     const completionList = await vscode.commands.executeCommand<vscode.CompletionList>(

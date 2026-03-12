@@ -52,7 +52,7 @@ const USAGE_GUIDE_TEXT = [
   "",
   "Parameter hints:",
   "- vscodeOperator_hoverAtPosition: line, column",
-  "- vscodeOperator_completionAt: line, column, triggerCharacter(optional)",
+  "- vscodeOperator_completionAt: line, column, triggerCharacter(optional), filePath(optional)",
   "- Position is 1-based.",
   "",
   "Examples:",
@@ -517,9 +517,11 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
 
     // Try to become the new proxy
     try {
+      this.appendLine(`Starting proxy re-election attempt (workspace=${this.workspacePath ?? "<unknown>"}, pid=${process.pid})`);
       const { McpProxyServer } = await import("./proxyServer.js");
       const proxy = new McpProxyServer();
       await proxy.start();
+      this.appendLine("Proxy re-election attempt finished (this instance may now be proxy, or another instance already owns it).");
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
     } catch (e) {
       this.appendLine(`Re-election error: ${e instanceof Error ? e.message : String(e)}`);
