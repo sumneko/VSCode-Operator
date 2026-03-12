@@ -21,10 +21,12 @@
 ### `vscodeOperator_hoverAtPosition`
 **何时调用：**
 - 需要查询指定行列的 hover/类型信息时调用（传 `line`、`column`，1-based）
+- 在多个 VS Code 工作区同时使用时，可以通过 `workspacePath` 参数指定查询的工作区（绝对路径）
 
 ### `vscodeOperator_completionAt`
 **何时调用：**
-- 对**不熟悉的类型或 API**（不确定方法名、属性名时），在开始编写该段代码前，集中查询相关位置的 LSP 补全，确认正确成员名称（传 `line`、`column`，1-based；可选 `triggerCharacter`，如 Lua 用 `":"`、JS/TS 用 `"."`）
+- 对**不熟悉的类型或 API**（不确定方法名、属性名时），在开始编写该段代码前，集中查询相关位置的 LSP 补全，确认正确成员名称（传 `line`、`column`，1-based；可选 `triggerCharacter`，如 Lua 用 `":"`、JS/TS 用 `"."`)
+- 在多个 VS Code 工作区同时使用时，可以通过 `workspacePath` 参数指定查询的工作区（绝对路径）
 
 ### `vscodeOperator_executeCommand`
 **何时调用：**
@@ -37,3 +39,17 @@
 - 在 Agent 模式下，无需等待用户指示，主动调用合适工具以收集上下文
 - 多个信息需求可以串行调用多个工具，逐步拼出完整上下文再回答
 - 工具调用失败时，告知用户具体错误信息，不要静默忽略
+
+## 多工作区支持
+
+VSCode Operator 支持同时连接多个 VS Code 工作区。架构说明：
+
+**代理服务器：** 在固定端口 19191 运行，接收所有 MCP 请求并根据 `workspacePath` 参数分派给对应的工作区 Bridge 服务器。
+
+**Bridge 服务器：** 每个 VS Code 实例启动一个 Bridge，监听自动分配的端口（19192+），并向代理注册自己所属的工作区路径。
+
+**客户端调用指南：**
+- 连接到代理服务器地址：`http://127.0.0.1:19191/mcp`
+- 在调用 `vscodeOperator_hoverAtPosition` 或 `vscodeOperator_completionAt` 时，包含 `workspacePath` 参数指定查询的工作区
+- 示例：`{"workspacePath": "/path/to/projectA", "line": 10, "column": 5}`
+- 如果不提供 `workspacePath`，代理会返回错误；客户端需明确指定工作区

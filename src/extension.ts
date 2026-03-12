@@ -8,11 +8,14 @@ import {
   ReadProblemsTool
 } from "./features";
 import { LmToolsMcpBridgeServer } from "./mcp/bridgeServer";
+import { McpProxyServer } from "./mcp/proxyServer";
 
 export function activate(context: vscode.ExtensionContext): void {
+  const mcpProxy = new McpProxyServer();
   const mcpBridge = new LmToolsMcpBridgeServer();
 
   context.subscriptions.push(
+    mcpProxy,
     mcpBridge,
     vscode.lm.registerTool("vscodeOperator_readProblems", new ReadProblemsTool()),
     vscode.lm.registerTool("vscodeOperator_activeEditorSummary", new ActiveEditorSummaryTool()),
@@ -34,7 +37,9 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  void mcpBridge.start();
+  // Start proxy first (if port is occupied another instance is acting as proxy, that's OK),
+  // then always start the bridge regardless of proxy outcome.
+  void mcpProxy.start().finally(() => mcpBridge.start());
 }
 
 export function deactivate(): void {

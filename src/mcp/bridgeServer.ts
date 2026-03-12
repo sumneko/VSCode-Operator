@@ -314,6 +314,8 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
   private currentConfig = getConfig();
   private currentPort: number | undefined;
   private lastError: string | undefined;
+  private workspacePath: string | undefined;
+  private proxyConnection: import("node:http").ClientRequest | undefined;
 
   async start(): Promise<void> {
     this.currentConfig = getConfig();
@@ -328,6 +330,14 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
       return;
     }
 
+    // Get workspace path
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      this.appendLine("No workspace folder open. MCP bridge requires an open workspace.");
+      return;
+    }
+    this.workspacePath = workspaceFolders[0].uri.fsPath;
+
     const server = createServer((req, res) => {
       void this.handleHttpRequest(req, res);
     });
@@ -338,21 +348,54 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
       void vscode.window.showWarningMessage(`VSCode Operator MCP bridge failed: ${this.lastError}`);
     });
 
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(this.currentConfig.port, this.currentConfig.host, () => {
-        server.off("error", reject);
-        resolve();
-      });
-    });
+    // Try to find an available port starting from proxyPort+1
+    let port = this.currentConfig.port + 1;
+    let listened = false;
+    const maxAttempts = 100;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(port, this.currentConfig.host, () => {
+            server.off("error", reject);
+            listened = true;
+            resolve();
+          });
+        });
+        break;
+      } catch (error) {
+        if (attempt < maxAttempts - 1) {
+          port++;
+        } else {
+          this.lastError = `Could not find available port after ${maxAttempts} attempts`;
+          this.appendLine(this.lastError);
+          throw error;
+        }
+      }
+    }
+
+    if (!listened) {
+      this.lastError = "Failed to listen on any port";
+      this.appendLine(this.lastError);
+      throw new Error(this.lastError);
+    }
 
     this.httpServer = server;
-    this.currentPort = this.getBoundPort(server);
+    this.currentPort = port;
     this.lastError = undefined;
+
+    // Connect to proxy via persistent SSE channel
+    void this.connectToProxy();
+
     this.appendLine(`MCP bridge listening on ${this.getEndpointUrl()}`);
   }
 
   async stop(): Promise<void> {
+    // Closing the proxy connection signals the proxy to auto-unregister this bridge
+    this.proxyConnection?.destroy();
+    this.proxyConnection = undefined;
+
     const server = this.httpServer;
     this.httpServer = undefined;
     this.currentPort = undefined;
@@ -414,6 +457,81 @@ export class LmToolsMcpBridgeServer implements vscode.Disposable {
   getEndpointUrl(): string {
     const port = this.currentPort ?? this.currentConfig.port;
     return `http://${this.currentConfig.host}:${port}${this.currentConfig.path}`;
+  }
+
+  private async connectToProxy(): Promise<void> {
+    if (!this.workspacePath || !this.currentPort || !this.httpServer) {
+      return;
+    }
+
+    const params = new URLSearchParams({
+      workspacePath: this.workspacePath,
+      host: this.currentConfig.host,
+      port: String(this.currentPort)
+    });
+
+    const { request } = await import("node:http");
+    const req = request(
+      {
+        hostname: "127.0.0.1",
+        port: this.currentConfig.port,
+        path: `/bridge-channel?${params}`,
+        method: "GET",
+        headers: { "Accept": "text/event-stream" }
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          this.appendLine(`Proxy channel rejected with status ${res.statusCode}, re-electing...`);
+          void this.reelectAndReconnect();
+          return;
+        }
+        this.appendLine("Connected to proxy (persistent channel).");
+        res.on("data", () => { /* consume keep-alive pings */ });
+        res.on("close", () => {
+          this.proxyConnection = undefined;
+          if (this.httpServer) {
+            this.appendLine("Proxy channel closed, re-electing...");
+            void this.reelectAndReconnect();
+          }
+        });
+      }
+    );
+
+    req.on("error", () => {
+      this.proxyConnection = undefined;
+      if (this.httpServer) {
+        this.appendLine("Proxy channel error, re-electing...");
+        void this.reelectAndReconnect();
+      }
+    });
+
+    req.end();
+    this.proxyConnection = req;
+  }
+
+  private async reelectAndReconnect(): Promise<void> {
+    if (!this.httpServer) {
+      return;
+    }
+
+    // Try to become the new proxy
+    try {
+      const { McpProxyServer } = await import("./proxyServer.js");
+      const proxy = new McpProxyServer();
+      await proxy.start();
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    } catch (e) {
+      this.appendLine(`Re-election error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    if (!this.httpServer) {
+      return;
+    }
+
+    // Reconnect to whichever instance won the election
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+    await this.connectToProxy();
   }
 
   dispose(): void {

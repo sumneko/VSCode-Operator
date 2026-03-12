@@ -24,21 +24,57 @@ It exposes diagnostics, hover/completion capabilities, and command execution as 
 
 ## MCP Bridge
 
-- Default endpoint: `http://127.0.0.1:19191/mcp`
-- Health check: `http://127.0.0.1:19191/health`
-- Purpose: expose `vscode.lm.tools` over MCP `tools/list` and forward `tools/call` to `vscode.lm.invokeTool`
-- Commands: `VSCode Operator: Show MCP Bridge Status`, `VSCode Operator: Restart MCP Bridge`
-- Settings: `vscodeOperator.mcpBridge.enabled`, `vscodeOperator.mcpBridge.host`, `vscodeOperator.mcpBridge.port`, `vscodeOperator.mcpBridge.path`
+### Architecture
 
-### Customize MCP Port
+VSCode Operator uses a **proxy + bridge architecture** to support multiple VS Code workspaces simultaneously:
 
-Default MCP port is `19191`. Users can change it in settings.
+- **Proxy Server**: Listens on fixed port `19191`, routes MCP requests to appropriate workspace bridges based on `workspacePath` parameter
+- **Bridge Server**: Each VS Code instance runs its own bridge (auto-assigned port 19192+), queries its local tools and registers with the proxy
+
+### Endpoints & Configuration
+
+- **Proxy endpoint**: `http://127.0.0.1:19191/mcp` (stable, connect here)
+- **Bridge registers at**: Each bridge auto-discovers an available port and registers with the proxy
+- **Health check**: `http://127.0.0.1:19191/health`
+- **Commands**: `VSCode Operator: Show MCP Bridge Status`, `VSCode Operator: Restart MCP Bridge`
+- **Settings**: `vscodeOperator.mcpBridge.enabled`, `vscodeOperator.mcpBridge.host`, `vscodeOperator.mcpBridge.port`, `vscodeOperator.mcpBridge.path`
+
+### Multi-Workspace Usage
+
+When multiple VS Code instances are running:
+
+1. Each runs its own MCP bridge server (auto-assigned port 19192+)
+2. All bridges register with the central proxy on port 19191
+3. MCP clients connect to the proxy endpoint: `http://127.0.0.1:19191/mcp`
+4. Include `workspacePath` parameter in tool calls to route to correct bridge:
 
 ```json
 {
-	"vscodeOperator.mcpBridge.port": 20191
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "vscodeOperator_hoverAtPosition",
+    "arguments": {
+      "workspacePath": "/absolute/path/to/projectA",
+      "line": 10,
+      "column": 5
+    }
+  }
 }
 ```
+
+### Customize Proxy Port
+
+Default proxy port is `19191`. To change it:
+
+```json
+{
+  "vscodeOperator.mcpBridge.port": 20191
+}
+```
+
+Note: Only the **first instance** uses the configured port. Additional instances auto-increment (19192, 19193, etc.).
 
 ## Development
 
