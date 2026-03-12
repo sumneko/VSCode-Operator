@@ -19,6 +19,8 @@ export class McpProxyServer implements vscode.Disposable {
   private readonly output = vscode.window.createOutputChannel("VSCode Operator Proxy");
   private httpServer: HttpServer | undefined;
   private bridges = new Map<string, BridgeRegistration>();
+  /** mcp-session-id → bridge that owns the session */
+  private sessions = new Map<string, BridgeRegistration>();
   private lastError: string | undefined;
 
   async start(): Promise<void> {
@@ -146,6 +148,12 @@ export class McpProxyServer implements vscode.Disposable {
         req.on("close", () => {
           clearInterval(pingInterval);
           this.bridges.delete(workspacePath);
+          // Clean up any sessions that were routed to this bridge
+          for (const [sid, b] of this.sessions) {
+            if (b.workspacePath === workspacePath) {
+              this.sessions.delete(sid);
+            }
+          }
           this.appendLine(`Bridge disconnected: ${workspacePath}`);
         });
 
@@ -154,40 +162,80 @@ export class McpProxyServer implements vscode.Disposable {
 
       // Handle MCP requests - forward to appropriate bridge
       if (url && url.startsWith("/mcp")) {
+        const urlObj = new URL(url, "http://127.0.0.1");
+        const workspacePathFromUrl = urlObj.searchParams.get("workspacePath");
+        const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+        // DELETE = session teardown
+        if (method === "DELETE") {
+          if (sessionId) {
+            const bridge = this.sessions.get(sessionId);
+            this.sessions.delete(sessionId);
+            if (bridge) {
+              await this.forwardRequest(bridge, "DELETE", url, "", req.headers, res);
+              return;
+            }
+          }
+          res.writeHead(200); res.end(); return;
+        }
+
         let body = "";
         req.on("data", (chunk) => {
           body += chunk.toString();
         });
         req.on("end", async () => {
           try {
-            // Parse the MCP request to extract workspacePath
-            const request = body ? JSON.parse(body) : {};
-            const workspacePath = request.params?.workspacePath || request.workspacePath;
+            const parsed = body ? JSON.parse(body) : {};
+            const rpcMethod: string = parsed.method ?? "";
+            const isInitialize = rpcMethod === "initialize";
 
-            if (!workspacePath) {
-              // No workspace path provided, return error
-              res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(
-                JSON.stringify({
-                  error: "workspacePath parameter is required in request"
-                })
-              );
-              return;
+            let bridge: BridgeRegistration | undefined;
+
+            // 1. Existing session → always route to the same bridge
+            if (sessionId && !isInitialize) {
+              bridge = this.sessions.get(sessionId);
+              if (!bridge) {
+                res.writeHead(404, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: `Session not found or expired: ${sessionId}` }));
+                return;
+              }
             }
 
-            const bridge = this.bridges.get(workspacePath);
+            // 2. workspacePath-based routing (URL param preferred, then body)
             if (!bridge) {
-              res.writeHead(404, { "Content-Type": "application/json" });
-              res.end(
-                JSON.stringify({
-                  error: `No bridge registered for workspace: ${workspacePath}`
-                })
-              );
-              return;
+              const workspacePath: string | null =
+                workspacePathFromUrl ??
+                parsed.params?.arguments?.workspacePath ??
+                parsed.params?.workspacePath ??
+                null;
+              if (workspacePath) {
+                bridge = this.bridges.get(workspacePath);
+                if (!bridge) {
+                  res.writeHead(404, { "Content-Type": "application/json" });
+                  res.end(JSON.stringify({ error: `No bridge registered for workspace: ${workspacePath}` }));
+                  return;
+                }
+              }
             }
 
-            // Forward request to the appropriate bridge
-            await this.forwardRequest(bridge, method || "GET", url, body, res);
+            // 3. Fallback: only one bridge open → auto-route
+            if (!bridge) {
+              if (this.bridges.size === 1) {
+                bridge = [...this.bridges.values()][0];
+              } else if (this.bridges.size === 0) {
+                res.writeHead(503, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "No VS Code bridge is connected yet. Open a workspace in VS Code first." }));
+                return;
+              } else {
+                res.writeHead(400, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({
+                  error: "Multiple workspaces are open. Specify workspacePath as a URL query parameter: /mcp?workspacePath=/path/to/workspace"
+                }));
+                return;
+              }
+            }
+
+            await this.forwardRequest(bridge, method || "POST", url, body, req.headers, res);
           } catch (error) {
             res.writeHead(400, { "Content-Type": "application/json" });
             res.end(
@@ -218,39 +266,47 @@ export class McpProxyServer implements vscode.Disposable {
     method: string,
     url: string,
     body: string,
+    reqHeaders: import("node:http").IncomingHttpHeaders,
     res: ServerResponse
   ): Promise<void> {
-    const options = {
-      hostname: bridge.host,
-      port: bridge.port,
-      path: url,
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(body)
-      }
+    // Forward relevant headers to the bridge
+    const headers: Record<string, string | string[]> = {
+      "content-type": (reqHeaders["content-type"] as string | undefined) ?? "application/json"
     };
+    if (body.length > 0) {
+      headers["content-length"] = String(Buffer.byteLength(body));
+    }
+    for (const h of ["mcp-session-id", "accept", "last-event-id"] as const) {
+      if (reqHeaders[h]) {
+        headers[h] = reqHeaders[h] as string;
+      }
+    }
 
     const { request } = await import("node:http");
-    const proxyReq = request(options, (proxyRes) => {
-      let responseBody = "";
-      proxyRes.on("data", (chunk) => {
-        responseBody += chunk;
-      });
-      proxyRes.on("end", () => {
+    const proxyReq = request(
+      { hostname: bridge.host, port: bridge.port, path: url, method, headers },
+      (proxyRes) => {
+        // Capture mcp-session-id from initialize response to enable session routing
+        const newSessionId = proxyRes.headers["mcp-session-id"] as string | undefined;
+        if (newSessionId) {
+          this.sessions.set(newSessionId, bridge);
+        }
         res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
-        res.end(responseBody);
-      });
-    });
+        // Pipe supports both plain JSON and SSE streaming responses
+        proxyRes.pipe(res);
+      }
+    );
 
     proxyReq.on("error", (error) => {
       this.appendLine(`Error forwarding request to bridge: ${error instanceof Error ? error.message : String(error)}`);
-      res.writeHead(502, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          error: `Error reaching bridge: ${error instanceof Error ? error.message : String(error)}`
-        })
-      );
+      if (!res.headersSent) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: `Error reaching bridge: ${error instanceof Error ? error.message : String(error)}`
+          })
+        );
+      }
     });
 
     if (body) {
