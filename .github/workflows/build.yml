@@ -28,10 +28,16 @@ jobs:
           npm ci
           npm run compile
 
+      - name: Prune dev dependencies
+        shell: bash
+        run: npm prune --omit=dev
+
       - name: Pack vsix
         shell: bash
         run: |
-          npx @vscode/vsce package -o "${{ env.VSIX_NAME }}"
+          npx @vscode/vsce package -o "${{ env.VSIX_NAME }}" \
+            --baseContentUrl "https://github.com/${{ github.repository }}/blob/${{ github.sha }}/" \
+            --baseImagesUrl "https://github.com/${{ github.repository }}/raw/${{ github.sha }}/"
 
       - name: Upload vsix
         uses: actions/upload-artifact@v4

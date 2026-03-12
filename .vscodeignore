@@ -1,6 +1,11 @@
 .vscode/**
 .vscode-test/**
+.github/**
+test/**
 src/**
+.git/**
 .gitignore
 .eslintrc.cjs
 tsconfig.json
+package-lock.json
+codepilot-*.vsix
