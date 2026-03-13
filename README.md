@@ -48,6 +48,7 @@ When you want AI to inspect paused state with fewer MCP calls, use:
 1. `vscodeOperator_debugSnapshot` first (single-call context capture)
 2. `vscodeOperator_debugControl` only when you need to continue/step/pause
 3. `vscodeOperator_debugEvaluate` for targeted follow-up expressions
+4. Before starting a new debug run, stop any stale prior session unless you intentionally want to reuse it
 
 Example snapshot call:
 
@@ -71,6 +72,8 @@ Use VSCode Operator debugger tools.
 1) Call vscodeOperator_debugSnapshot first.
 2) Summarize current paused state from topFrame/scopes/variables.
 3) Only if needed, call vscodeOperator_debugControl or vscodeOperator_debugEvaluate.
+4) Before starting a new debug session, stop any previous session unless it is clearly the one you should keep using.
+5) After finishing the investigation, stop the debug session if it is no longer needed.
 Avoid unnecessary extra tool calls.
 ```
 
@@ -86,7 +89,17 @@ Then:
 1) Explain the current execution location and likely root cause.
 2) If one key value is still missing, do one vscodeOperator_debugEvaluate call only.
 3) Propose the next debugging action (continue/stepOver/stepInto) with reason.
+4) If a fresh run is needed, stop the previous debug session before starting the next one.
+5) If the old session may have been misused, do not trust it; stop it first and restart cleanly.
 ```
+
+### Debug Session Hygiene
+
+To avoid AI accidentally reusing stale debugger state:
+
+1. Before the second and later debug launches, stop the previous session unless you explicitly want to continue it.
+2. If previous debug results may have been misapplied, stop the old session before doing any new inspection.
+3. After a debugging task is complete, stop the session to avoid contaminating the next task.
 
 ## MCP Bridge
 

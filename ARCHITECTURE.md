@@ -79,12 +79,20 @@ Key decisions:
    - `vscode.debug.onDidTerminateDebugSession`
    - fallback to `vscode.debug.activeDebugSession`
 
+### Debug session hygiene
+
+- Before starting a new debug session, check whether an earlier session is still active.
+- For the second and later launches, stop the previous session by default unless the caller explicitly wants to reuse it.
+- If previous debug findings may have been misapplied, treat the old session as untrusted: stop it first, then restart cleanly.
+- After the debugging task is complete, stop the session if it is no longer needed. This prevents stale state from contaminating later requests.
+
 ## Low-Roundtrip Strategy
 
 To reduce AI request count during paused debugging, prefer:
 
 1. `vscodeOperator_debugSnapshot`
 2. then optional targeted follow-ups (`debugControl`, `debugEvaluate`)
+3. when a fresh run is required, stop any stale prior session before calling `debugStart`
 
 `debugSnapshot` packs into one call:
 
@@ -94,6 +102,15 @@ To reduce AI request count during paused debugging, prefer:
 - optional batch expression evaluation
 
 This replaces typical multi-call chains (`threads -> stackTrace -> scopes -> variables -> evaluate`).
+
+Recommended session lifecycle:
+
+1. `debugStatus` or `debugSnapshot` to inspect current state
+2. `debugControl` with `action="stop"` if an old session should not be reused
+3. `debugStart` for a fresh run
+4. `debugSnapshot` for compact paused-state inspection
+5. `debugEvaluate` or `debugControl` only when targeted follow-up is needed
+6. `debugControl` with `action="stop"` after the investigation finishes
 
 ## MCP Architecture
 
