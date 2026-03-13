@@ -7,11 +7,13 @@ It also starts a local MCP bridge inside the Extension Host so external MCP clie
 ## Simple Intro (For Marketplace)
 
 VSCode Operator connects AI assistants to real VS Code context.
-It exposes diagnostics, hover/completion capabilities, and command execution as tools, and provides a built-in local MCP bridge so external MCP clients can discover and call the same toolset in your live editor session.
+It exposes diagnostics, hover/completion capabilities, command execution, and debugger control/introspection as tools, and provides a built-in local MCP bridge so external MCP clients can discover and call the same toolset in your live editor session.
 
 > **For detailed architecture and design decisions, see [ARCHITECTURE.md](ARCHITECTURE.md).**
 
 ## Tools
+
+### Core Editor Tools
 
 | Tool | Reference name | Purpose |
 |---|---|---|
@@ -21,6 +23,70 @@ It exposes diagnostics, hover/completion capabilities, and command execution as 
 | `vscodeOperator_hoverAtPosition` | `hoverAtPosition` | Get hover info at a specific line/column |
 | `vscodeOperator_completionAt` | `completionAt` | Get completion candidates at a specific line/column |
 | `vscodeOperator_executeCommand` | `executeCommand` | Execute any VS Code command by ID with automatic URI deserialization |
+
+### Debugger Tools (AI Can Operate Debugger)
+
+| Tool | Reference name | Purpose |
+|---|---|---|
+| `vscodeOperator_debugStart` | `debugStart` | Start debug session by launch config name or inline configuration |
+| `vscodeOperator_debugSetBreakpoints` | `debugSetBreakpoints` | Set source breakpoints by file + line numbers |
+| `vscodeOperator_debugClearBreakpoints` | `debugClearBreakpoints` | Clear breakpoints globally or by file |
+| `vscodeOperator_debugControl` | `debugControl` | Continue, pause, step over/into/out, restart, or stop |
+| `vscodeOperator_debugGetThreads` | `debugGetThreads` | Get DAP thread list |
+| `vscodeOperator_debugGetTopFrame` | `debugGetTopFrame` | Get current top stack frame quickly |
+| `vscodeOperator_debugGetStackTrace` | `debugGetStackTrace` | Get stack trace for a thread |
+| `vscodeOperator_debugGetScopes` | `debugGetScopes` | Get scopes by frame id |
+| `vscodeOperator_debugGetVariables` | `debugGetVariables` | Get variables by `variablesReference` |
+| `vscodeOperator_debugEvaluate` | `debugEvaluate` | Evaluate expression in debug context |
+| `vscodeOperator_debugSnapshot` | `debugSnapshot` | One-shot snapshot: top frame + scopes + variables + optional evaluate |
+| `vscodeOperator_debugStatus` | `debugStatus` | Snapshot of active sessions, breakpoints, and thread preview |
+
+### Recommended Low-Roundtrip Debug Flow
+
+When you want AI to inspect paused state with fewer MCP calls, use:
+
+1. `vscodeOperator_debugSnapshot` first (single-call context capture)
+2. `vscodeOperator_debugControl` only when you need to continue/step/pause
+3. `vscodeOperator_debugEvaluate` for targeted follow-up expressions
+
+Example snapshot call:
+
+```json
+{
+  "maxScopes": 4,
+  "maxVariablesPerScope": 80,
+  "evaluateExpressions": ["this", "req", "res.statusCode"],
+  "evaluateContext": "watch"
+}
+```
+
+### Agent Prompt Templates (Debugger)
+
+Use the following prompt templates to make AI prefer fewer roundtrips.
+
+Minimal snapshot-first template:
+
+```text
+Use VSCode Operator debugger tools.
+1) Call vscodeOperator_debugSnapshot first.
+2) Summarize current paused state from topFrame/scopes/variables.
+3) Only if needed, call vscodeOperator_debugControl or vscodeOperator_debugEvaluate.
+Avoid unnecessary extra tool calls.
+```
+
+Snapshot + targeted evaluate template:
+
+```text
+Use vscodeOperator_debugSnapshot with:
+- maxScopes=4
+- maxVariablesPerScope=80
+- evaluateExpressions=["this", "req", "res.statusCode"]
+
+Then:
+1) Explain the current execution location and likely root cause.
+2) If one key value is still missing, do one vscodeOperator_debugEvaluate call only.
+3) Propose the next debugging action (continue/stepOver/stepInto) with reason.
+```
 
 ## MCP Bridge
 
@@ -84,6 +150,6 @@ npm run compile   # tsc -p ./ → dist/
 npm run watch     # incremental compile during development
 ```
 
-Press **F5** to launch an Extension Development Host. Copilot Agent can then invoke all three tools automatically based on context (see `.github/copilot-instructions.md`).
+Press **F5** to launch an Extension Development Host. Copilot Agent can then invoke registered tools automatically based on context (see `.github/copilot-instructions.md`).
 
 The local MCP bridge starts automatically on activation unless `vscodeOperator.mcpBridge.enabled` is disabled.

@@ -249,6 +249,400 @@
             }
           }
         }
+      },
+      {
+        "name": "vscodeOperator_debugStart",
+        "tags": [
+          "vscode",
+          "debug"
+        ],
+        "toolReferenceName": "debugStart",
+        "displayName": "Start Debug Session",
+        "modelDescription": "Start a VS Code debug session by launch config name or inline debug configuration.",
+        "userDescription": "Start debugging.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Launch configuration name from launch.json"
+            },
+            "configuration": {
+              "type": "object",
+              "description": "Inline debug configuration object"
+            },
+            "workspacePath": {
+              "type": "string",
+              "description": "Optional workspace path to start debugging in"
+            },
+            "noDebug": {
+              "type": "boolean",
+              "description": "Run without debugging"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugSetBreakpoints",
+        "tags": [
+          "vscode",
+          "debug",
+          "breakpoint"
+        ],
+        "toolReferenceName": "debugSetBreakpoints",
+        "displayName": "Set Source Breakpoints",
+        "modelDescription": "Set source breakpoints for a file by 1-based line numbers.",
+        "userDescription": "Set breakpoints in a file.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "filePath",
+            "lines"
+          ],
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute file path, or path relative to workspacePath/current workspace"
+            },
+            "workspacePath": {
+              "type": "string",
+              "description": "Optional workspace path used to resolve relative filePath"
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "description": "1-based line numbers"
+            },
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether breakpoints are enabled"
+            },
+            "condition": {
+              "type": "string",
+              "description": "Conditional breakpoint expression"
+            },
+            "hitCondition": {
+              "type": "string",
+              "description": "Hit count condition"
+            },
+            "logMessage": {
+              "type": "string",
+              "description": "Logpoint message"
+            },
+            "clearExistingInFile": {
+              "type": "boolean",
+              "description": "Remove existing source breakpoints in this file before adding new ones"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugControl",
+        "tags": [
+          "vscode",
+          "debug",
+          "control"
+        ],
+        "toolReferenceName": "debugControl",
+        "displayName": "Control Debugger",
+        "modelDescription": "Control execution flow of an active debug session (continue/step/pause/restart/stop).",
+        "userDescription": "Control debugger execution.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "action"
+          ],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "stepOver",
+                "stepInto",
+                "stepOut",
+                "pause",
+                "restart",
+                "stop"
+              ]
+            },
+            "sessionId": {
+              "type": "string",
+              "description": "Optional debug session id"
+            },
+            "threadId": {
+              "type": "number",
+              "description": "Optional thread id for continue/step/pause actions"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugClearBreakpoints",
+        "tags": [
+          "vscode",
+          "debug",
+          "breakpoint"
+        ],
+        "toolReferenceName": "debugClearBreakpoints",
+        "displayName": "Clear Breakpoints",
+        "modelDescription": "Clear breakpoints globally or clear source breakpoints for a specific file.",
+        "userDescription": "Clear breakpoints.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Optional file path for file-scoped clear (absolute or relative to workspacePath/current workspace)"
+            },
+            "workspacePath": {
+              "type": "string",
+              "description": "Optional workspace path for resolving relative filePath"
+            },
+            "all": {
+              "type": "boolean",
+              "description": "Set true to clear all breakpoints"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugGetThreads",
+        "tags": [
+          "vscode",
+          "debug",
+          "dap"
+        ],
+        "toolReferenceName": "debugGetThreads",
+        "displayName": "Get Debug Threads",
+        "modelDescription": "Read thread list from the active debug session.",
+        "userDescription": "Get debug threads.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugGetTopFrame",
+        "tags": [
+          "vscode",
+          "debug",
+          "dap"
+        ],
+        "toolReferenceName": "debugGetTopFrame",
+        "displayName": "Get Top Stack Frame",
+        "modelDescription": "Get the top stack frame of a debug thread, useful for quickly finding current paused location.",
+        "userDescription": "Get top frame of current thread.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "threadId": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugSnapshot",
+        "tags": [
+          "vscode",
+          "debug",
+          "dap"
+        ],
+        "toolReferenceName": "debugSnapshot",
+        "displayName": "Get Debug Snapshot",
+        "modelDescription": "Get a compact one-shot debug snapshot: top frame, scopes, variables, and optional expression evaluations.",
+        "userDescription": "Get one-shot debug snapshot.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "threadId": {
+              "type": "number"
+            },
+            "maxScopes": {
+              "type": "number",
+              "description": "Maximum number of scopes to fetch, default 3"
+            },
+            "maxVariablesPerScope": {
+              "type": "number",
+              "description": "Maximum variables to fetch per scope, default 50"
+            },
+            "evaluateExpressions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional expressions to evaluate in current frame"
+            },
+            "evaluateContext": {
+              "type": "string",
+              "description": "DAP evaluate context, default watch"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugGetStackTrace",
+        "tags": [
+          "vscode",
+          "debug",
+          "dap"
+        ],
+        "toolReferenceName": "debugGetStackTrace",
+        "displayName": "Get Stack Trace",
+        "modelDescription": "Read stack trace from a debug thread.",
+        "userDescription": "Get stack trace.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "threadId": {
+              "type": "number"
+            },
+            "startFrame": {
+              "type": "number"
+            },
+            "levels": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugGetScopes",
+        "tags": [
+          "vscode",
+          "debug",
+          "dap"
+        ],
+        "toolReferenceName": "debugGetScopes",
+        "displayName": "Get Frame Scopes",
+        "modelDescription": "Read scopes for a stack frame.",
+        "userDescription": "Get scopes by frame id.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "frameId"
+          ],
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "frameId": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugGetVariables",
+        "tags": [
+          "vscode",
+          "debug",
+          "dap"
+        ],
+        "toolReferenceName": "debugGetVariables",
+        "displayName": "Get Variables",
+        "modelDescription": "Read variables from a scope/variable reference.",
+        "userDescription": "Get variables by variablesReference.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "variablesReference"
+          ],
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "variablesReference": {
+              "type": "number"
+            },
+            "start": {
+              "type": "number"
+            },
+            "count": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugEvaluate",
+        "tags": [
+          "vscode",
+          "debug",
+          "dap"
+        ],
+        "toolReferenceName": "debugEvaluate",
+        "displayName": "Evaluate Expression",
+        "modelDescription": "Evaluate an expression in debug context.",
+        "userDescription": "Evaluate expression during debug.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "expression"
+          ],
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "expression": {
+              "type": "string"
+            },
+            "frameId": {
+              "type": "number"
+            },
+            "context": {
+              "type": "string",
+              "description": "DAP evaluate context, e.g. watch/repl/hover"
+            }
+          }
+        }
+      },
+      {
+        "name": "vscodeOperator_debugStatus",
+        "tags": [
+          "vscode",
+          "debug",
+          "status"
+        ],
+        "toolReferenceName": "debugStatus",
+        "displayName": "Get Debug Status",
+        "modelDescription": "Get current debug sessions, breakpoint summary, and thread preview.",
+        "userDescription": "Get debug status snapshot.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            }
+          }
+        }
       }
     ]
   },
