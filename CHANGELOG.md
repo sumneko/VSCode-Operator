@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2
+
+- 强化 AI 调试防误用：默认要求新调试前先清理旧会话，并补充 DAP 参数获取提示（threadId/frameId/variablesReference）。 / Strengthened safe AI debugging: enforce stop-before-start guidance and added DAP parameter acquisition hints (threadId/frameId/variablesReference).
+
 ## 1.2.1
 
 - 完善 AI 调试器使用说明，增加调试会话清理规则与低往返调试提示模板。 / Improved AI debugger guidance with session cleanup rules and low-roundtrip prompt templates.

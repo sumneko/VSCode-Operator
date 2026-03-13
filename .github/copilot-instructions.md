@@ -42,9 +42,17 @@
 
 **调试会话清理规则：**
 - 在启动新的调试会话前，先检查是否存在旧的调试会话
+- 在调用 `vscodeOperator_debugStart` 之前，默认必须先清理旧会话（`vscodeOperator_debugControl` with `action="stop"`），除非用户明确要求复用
 - 如果前一次调试结果可能已经被误用，或当前会话上下文不再可信，必须先调用 `vscodeOperator_debugControl` 并使用 `action="stop"` 断开旧会话，再重新开始
 - 在完成本次调试分析后，如果不再需要继续调试，应主动停止当前调试会话，避免后续请求误复用旧会话
 - 第二次及后续启动调试前，默认先停掉已有会话，除非用户明确要求保留并复用当前会话
+
+**DAP 参数获取提示（避免猜参数）：**
+- 优先调用 `vscodeOperator_debugSnapshot`，一次性获取 `topFrame/scopes/variables`
+- `threadId`：来自 `vscodeOperator_debugGetThreads`（或 `debugSnapshot/debugGetTopFrame`）
+- `frameId`：来自 `vscodeOperator_debugGetTopFrame` 或 `vscodeOperator_debugGetStackTrace`
+- `variablesReference`：来自 `vscodeOperator_debugGetScopes` 的 `scopes[*].variablesReference`
+- 若拿不到 `topFrame`，先调用 `vscodeOperator_debugControl` with `action="pause"`，或继续运行到断点
 
 ## 通用原则
 - 在 Agent 模式下，无需等待用户指示，主动调用合适工具以收集上下文

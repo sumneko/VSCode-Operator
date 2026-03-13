@@ -124,6 +124,16 @@ function toError(message: string): vscode.LanguageModelToolResult {
   return toResult({ error: message });
 }
 
+function dapHintText(): string {
+  return [
+    "DAP hint:",
+    "threadId <- debugGetThreads/debugGetTopFrame/debugSnapshot;",
+    "frameId <- debugGetTopFrame/debugGetStackTrace;",
+    "variablesReference <- debugGetScopes;",
+    "if no frame exists, call debugControl(action='pause') first."
+  ].join(" ");
+}
+
 function normalizeForCompare(value: string): string {
   const trimmed = value.trim();
   if (/^[a-zA-Z]:/.test(trimmed)) {
@@ -171,7 +181,7 @@ async function customRequest(
   try {
     return await session.customRequest(command, args);
   } catch (error) {
-    throw new Error(`DAP request '${command}' failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`DAP request '${command}' failed: ${error instanceof Error ? error.message : String(error)} ${dapHintText()}`);
   }
 }
 
@@ -194,7 +204,7 @@ async function resolveThreadId(session: vscode.DebugSession, inputThreadId?: num
 
   const threads = await getThreads(session);
   if (threads.length === 0) {
-    throw new Error("No debug threads found in the active session.");
+    throw new Error(`No debug threads found in the active session. ${dapHintText()}`);
   }
 
   return threads[0].id;
@@ -233,7 +243,7 @@ export class DebugStartTool implements vscode.LanguageModelTool<DebugStartInput>
       : undefined;
 
     if (!name && !configuration) {
-      return toError("Provide either 'name' (launch config name) or 'configuration' (inline debug configuration).");
+      return toError("Provide either 'name' (launch config name) or 'configuration' (inline debug configuration). Tip: call vscodeOperator_debugStatus to inspect existing sessions first.");
     }
 
     const folder = resolveWorkspaceFolder(input.workspacePath);
@@ -315,7 +325,7 @@ export class DebugControlTool implements vscode.LanguageModelTool<DebugControlIn
 
     const session = resolveSession(input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     if (action === "stop") {
@@ -393,7 +403,7 @@ export class DebugGetThreadsTool implements vscode.LanguageModelTool<DebugGetThr
   async invoke(options: vscode.LanguageModelToolInvocationOptions<DebugGetThreadsInput>): Promise<vscode.LanguageModelToolResult> {
     const session = resolveSession(options.input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     const threads = await getThreads(session);
@@ -410,7 +420,7 @@ export class DebugGetStackTraceTool implements vscode.LanguageModelTool<DebugGet
     const input = options.input;
     const session = resolveSession(input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     const threadId = await resolveThreadId(session, input.threadId);
@@ -436,11 +446,11 @@ export class DebugGetScopesTool implements vscode.LanguageModelTool<DebugGetScop
     const input = options.input;
     const session = resolveSession(input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     if (typeof input.frameId !== "number" || !Number.isInteger(input.frameId) || input.frameId < 0) {
-      return toError("frameId is required and must be an integer >= 0.");
+      return toError("frameId is required and must be an integer >= 0. Tip: call vscodeOperator_debugGetTopFrame or vscodeOperator_debugGetStackTrace first.");
     }
 
     const response = await customRequest(session, "scopes", { frameId: input.frameId });
@@ -457,11 +467,11 @@ export class DebugGetVariablesTool implements vscode.LanguageModelTool<DebugGetV
     const input = options.input;
     const session = resolveSession(input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     if (typeof input.variablesReference !== "number" || !Number.isInteger(input.variablesReference) || input.variablesReference <= 0) {
-      return toError("variablesReference is required and must be an integer > 0.");
+      return toError("variablesReference is required and must be an integer > 0. Tip: call vscodeOperator_debugGetScopes and use scopes[*].variablesReference.");
     }
 
     const args: JsonObject = { variablesReference: input.variablesReference };
@@ -486,7 +496,7 @@ export class DebugEvaluateTool implements vscode.LanguageModelTool<DebugEvaluate
     const input = options.input;
     const session = resolveSession(input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     if (typeof input.expression !== "string" || input.expression.trim().length === 0) {
@@ -514,7 +524,7 @@ export class DebugGetTopFrameTool implements vscode.LanguageModelTool<DebugGetTo
     const input = options.input;
     const session = resolveSession(input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     const threadId = await resolveThreadId(session, input.threadId);
@@ -541,7 +551,7 @@ export class DebugSnapshotTool implements vscode.LanguageModelTool<DebugSnapshot
     const input = options.input;
     const session = resolveSession(input.sessionId);
     if (!session) {
-      return toError("No debug session is active.");
+      return toError("No debug session is active. Call vscodeOperator_debugStart first, or inspect existing sessions via vscodeOperator_debugStatus.");
     }
 
     const threadId = await resolveThreadId(session, input.threadId);
@@ -563,7 +573,7 @@ export class DebugSnapshotTool implements vscode.LanguageModelTool<DebugSnapshot
         topFrame: null,
         scopes: [],
         evaluations: [],
-        note: "No top frame is available. The debugger may be running instead of paused."
+        note: "No top frame is available. The debugger may be running instead of paused. Use vscodeOperator_debugControl(action='pause') and retry, or continue to a breakpoint."
       });
     }
 

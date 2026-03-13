@@ -1,7 +1,7 @@
 {
   "name": "vscode-operator",
   "displayName": "VSCode Operator",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "publisher": "sumneko",
   "description": "AI that operates VS Code like a real developer through Language Model Tools and a local MCP bridge.",
   "main": "./dist/extension.js",
