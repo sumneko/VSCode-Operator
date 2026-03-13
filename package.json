@@ -77,6 +77,31 @@
               "type": "number",
               "description": "Maximum number of diagnostics to return",
               "default": 200
+            },
+            "minSeverity": {
+              "type": "string",
+              "description": "Minimum severity level to include. Default is warning (returns warning + error).",
+              "enum": [
+                "error",
+                "warning",
+                "information",
+                "hint"
+              ],
+              "default": "warning"
+            },
+            "pathGlob": {
+              "description": "Optional glob filter for file paths. Supports absolute and workspace-relative globs. Accepts a single string, a comma-separated string, or an array of strings. Prefix a pattern with ! to exclude matches.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           }
         }

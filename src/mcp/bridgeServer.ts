@@ -83,6 +83,20 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
         maxItems: {
           type: "number",
           description: "Maximum number of diagnostics to return"
+        },
+        minSeverity: {
+          type: "string",
+          description: "Minimum severity to include: error, warning, information, hint"
+        },
+        pathGlob: {
+          oneOf: [
+            { type: "string" },
+            {
+              type: "array",
+              items: { type: "string" }
+            }
+          ],
+          description: "Optional path glob filter (absolute or workspace-relative). Accepts string/comma-separated string/array. Prefix with ! for exclusion."
         }
       }
     },
@@ -102,6 +116,20 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
         maxItems: {
           type: "number",
           description: "Maximum number of diagnostics to return"
+        },
+        minSeverity: {
+          type: "string",
+          description: "Minimum severity to include: error, warning, information, hint"
+        },
+        pathGlob: {
+          oneOf: [
+            { type: "string" },
+            {
+              type: "array",
+              items: { type: "string" }
+            }
+          ],
+          description: "Optional path glob filter (absolute or workspace-relative). Accepts string/comma-separated string/array. Prefix with ! for exclusion."
         }
       }
     },
