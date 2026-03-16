@@ -88,7 +88,18 @@ type DapThread = {
   name?: string;
 };
 
+type DebugStopState = {
+  reason?: string;
+  description?: string;
+  text?: string;
+  threadId?: number;
+  allThreadsStopped?: boolean;
+  hitBreakpointIds?: number[];
+  at: string;
+};
+
 const knownSessions = new Map<string, vscode.DebugSession>();
+const lastStopBySession = new Map<string, DebugStopState>();
 let sessionTrackingInitialized = false;
 
 function ensureSessionTracking(): void {
@@ -102,6 +113,29 @@ function ensureSessionTracking(): void {
   });
   vscode.debug.onDidTerminateDebugSession((session) => {
     knownSessions.delete(session.id);
+    lastStopBySession.delete(session.id);
+  });
+  vscode.debug.onDidReceiveDebugSessionCustomEvent((event) => {
+    if (event.event === "continued") {
+      lastStopBySession.delete(event.session.id);
+      return;
+    }
+    if (event.event !== "stopped") {
+      return;
+    }
+
+    const body = (event.body ?? {}) as Record<string, unknown>;
+    lastStopBySession.set(event.session.id, {
+      reason: typeof body.reason === "string" ? body.reason : undefined,
+      description: typeof body.description === "string" ? body.description : undefined,
+      text: typeof body.text === "string" ? body.text : undefined,
+      threadId: typeof body.threadId === "number" ? body.threadId : undefined,
+      allThreadsStopped: typeof body.allThreadsStopped === "boolean" ? body.allThreadsStopped : undefined,
+      hitBreakpointIds: Array.isArray(body.hitBreakpointIds)
+        ? body.hitBreakpointIds.filter((id): id is number => typeof id === "number")
+        : undefined,
+      at: new Date().toISOString()
+    });
   });
 }
 
@@ -232,6 +266,45 @@ function toDebugSessionSummary(session: vscode.DebugSession): JsonObject {
     type: session.type,
     workspaceFolder: session.workspaceFolder?.uri.fsPath ?? null
   };
+}
+
+function getStopState(session: vscode.DebugSession): DebugStopState | undefined {
+  return lastStopBySession.get(session.id);
+}
+
+function classifyStopKind(state: DebugStopState | undefined): "exception" | "breakpoint" | "pause" | "step" | "entry" | "other" | null {
+  if (!state) {
+    return null;
+  }
+
+  const reason = (state.reason ?? "").toLowerCase();
+  const text = `${state.description ?? ""} ${state.text ?? ""}`.toLowerCase();
+  if (reason.includes("exception") || text.includes("exception")) {
+    return "exception";
+  }
+  if (reason.includes("breakpoint") || (state.hitBreakpointIds?.length ?? 0) > 0) {
+    return "breakpoint";
+  }
+  if (reason.includes("pause")) {
+    return "pause";
+  }
+  if (reason.includes("step")) {
+    return "step";
+  }
+  if (reason.includes("entry")) {
+    return "entry";
+  }
+  return "other";
+}
+
+function stopHandlingHint(kind: ReturnType<typeof classifyStopKind>): string | undefined {
+  if (kind === "exception") {
+    return "Stopped by exception. Do not treat this as a normal breakpoint. Inspect exception object/message and call stack first.";
+  }
+  if (kind === "breakpoint") {
+    return "Stopped at breakpoint. Continue stepping/inspection as needed.";
+  }
+  return undefined;
 }
 
 export class DebugStartTool implements vscode.LanguageModelTool<DebugStartInput> {
@@ -535,10 +608,15 @@ export class DebugGetTopFrameTool implements vscode.LanguageModelTool<DebugGetTo
 
     const frames = Array.isArray(response.stackFrames) ? response.stackFrames : [];
     const topFrame = frames.length > 0 ? frames[0] : null;
+    const stopState = getStopState(session);
+    const stopKind = classifyStopKind(stopState);
 
     return toResult({
       session: toDebugSessionSummary(session),
       threadId,
+      stopState: stopState ?? null,
+      stopKind,
+      stopHint: stopHandlingHint(stopKind) ?? null,
       topFrame,
       totalFrames: typeof response.totalFrames === "number" ? response.totalFrames : frames.length,
       paused: topFrame !== null
@@ -564,11 +642,16 @@ export class DebugSnapshotTool implements vscode.LanguageModelTool<DebugSnapshot
       ? stack.stackFrames[0]
       : null;
     const frameId = topFrame && typeof topFrame.id === "number" ? topFrame.id : undefined;
+    const stopState = getStopState(session);
+    const stopKind = classifyStopKind(stopState);
 
     if (frameId === undefined) {
       return toResult({
         session: toDebugSessionSummary(session),
         threadId,
+        stopState: stopState ?? null,
+        stopKind,
+        stopHint: stopHandlingHint(stopKind) ?? null,
         paused: false,
         topFrame: null,
         scopes: [],
@@ -648,6 +731,9 @@ export class DebugSnapshotTool implements vscode.LanguageModelTool<DebugSnapshot
     return toResult({
       session: toDebugSessionSummary(session),
       threadId,
+      stopState: stopState ?? null,
+      stopKind,
+      stopHint: stopHandlingHint(stopKind) ?? null,
       paused: true,
       topFrame,
       totalFrames: typeof stack.totalFrames === "number" ? stack.totalFrames : undefined,
@@ -675,6 +761,8 @@ export class DebugStatusTool implements vscode.LanguageModelTool<DebugStatusInpu
       }, {});
 
     let threadPreview: DapThread[] | undefined;
+    const stopState = selected ? getStopState(selected) : undefined;
+    const stopKind = classifyStopKind(stopState);
     if (selected) {
       try {
         threadPreview = await getThreads(selected);
@@ -690,6 +778,9 @@ export class DebugStatusTool implements vscode.LanguageModelTool<DebugStatusInpu
         total: vscode.debug.breakpoints.length,
         sourceByFile: breakpointsByFile
       },
+      stopState: stopState ?? null,
+      stopKind,
+      stopHint: stopHandlingHint(stopKind) ?? null,
       threads: threadPreview ?? null,
       note: "Paused/running state is debugger-adapter specific. Use debug_get_stacktrace/debug_get_scopes/debug_get_variables for live inspection."
     });

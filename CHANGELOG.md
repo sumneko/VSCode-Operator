@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.3
+
+- 增强调试异常处理：`debugSnapshot/debugStatus/debugGetTopFrame` 现在返回 `stopKind/stopState/stopHint`，可区分 `exception` 与普通断点。 / Improved exception-stop handling: `debugSnapshot/debugStatus/debugGetTopFrame` now return `stopKind/stopState/stopHint` to distinguish `exception` from normal breakpoints.
+- 补充 DAP 参数与异常断点处理提示，降低 AI 误判和参数误传。 / Added DAP-parameter and exception-stop guidance to reduce AI misclassification and invalid debug arguments.
+
 ## 1.2.2
 
 - 强化 AI 调试防误用：默认要求新调试前先清理旧会话，并补充 DAP 参数获取提示（threadId/frameId/variablesReference）。 / Strengthened safe AI debugging: enforce stop-before-start guidance and added DAP parameter acquisition hints (threadId/frameId/variablesReference).

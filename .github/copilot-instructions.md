@@ -1,5 +1,8 @@
 # VSCode Operator 工具使用规范
 
+发布流程规则文件：`.github/release-rules.md`
+- 当用户要求“发布/发版/打 tag/更新 changelog”时，优先遵循该文件中的步骤与模板。
+
 本扩展提供以下 Copilot 工具，Copilot 在 Agent 模式下应**主动判断并调用**，无需用户手动指示。
 
 ## 工具列表与调用时机
@@ -53,6 +56,11 @@
 - `frameId`：来自 `vscodeOperator_debugGetTopFrame` 或 `vscodeOperator_debugGetStackTrace`
 - `variablesReference`：来自 `vscodeOperator_debugGetScopes` 的 `scopes[*].variablesReference`
 - 若拿不到 `topFrame`，先调用 `vscodeOperator_debugControl` with `action="pause"`，或继续运行到断点
+
+**异常断点处理提示：**
+- 优先读取 `debugSnapshot/debugStatus` 返回的 `stopKind/stopState`
+- 若 `stopKind` 或 `stopState.reason` 表示 `exception`，不要按普通断点处理
+- 异常停止时先检查异常信息与调用栈，再决定是否单步或继续运行
 
 ## 通用原则
 - 在 Agent 模式下，无需等待用户指示，主动调用合适工具以收集上下文
