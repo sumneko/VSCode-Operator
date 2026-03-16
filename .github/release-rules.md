@@ -22,9 +22,8 @@ Use these rules when the user asks to release a version, update changelog, creat
 - Keep entries concise and bilingual (`中文 / English`)
 - Summarize user-visible behavior changes only
 
-4. (Optional but recommended) Add release notes file:
-- File name: `RELEASE_NOTES_<version>.md`
-- Keep bilingual format
+4. Do NOT create standalone release notes files by default:
+- Do not generate files like `RELEASE_NOTES_<version>.md` unless the user explicitly asks for one.
 
 5. Validate build:
 - Run `npm run compile`
