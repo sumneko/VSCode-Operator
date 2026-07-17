@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.10
+
+- 补齐多工作区参数声明：为核心工具与调试工具输入类型补充可选 `workspacePath`，减少路由场景下的参数校验报错。 / Completed multi-workspace parameter declarations: added optional `workspacePath` to core and debugger tool inputs to reduce validation errors in routed calls.
+- 修复 MCP 兼容别名参数透传：`get_problems/get_diagnostics/hover/get_hover_info` 现在声明并转发 `workspacePath`，多工作区下路由更稳定。 / Fixed MCP alias parameter passthrough: `get_problems/get_diagnostics/hover/get_hover_info` now declare and forward `workspacePath`, improving routing stability in multi-workspace mode.
+
 ## 1.2.9
 
 - 修复多工作区路由参数透传问题：bridge server 在调用工具前会过滤掉工具 schema 中未声明的路由参数（如 `workspacePath`），避免 `activeEditorSummary`/`hoverTopVisible` 等无参工具因收到多余字段而报错。 / Fixed routing-parameter leakage in multi-workspace mode: the bridge server now strips routing-only parameters (e.g. `workspacePath`) that are not declared in the target tool's input schema, preventing spurious "unsupported fields" errors on no-parameter tools such as `activeEditorSummary` and `hoverTopVisible`.

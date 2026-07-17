@@ -25,6 +25,7 @@ type DebugControlAction = "continue" | "stepOver" | "stepInto" | "stepOut" | "pa
 
 type DebugControlInput = {
   action?: DebugControlAction;
+  workspacePath?: string;
   sessionId?: string;
   threadId?: number;
 };
@@ -36,10 +37,12 @@ type DebugClearBreakpointsInput = {
 };
 
 type DebugGetThreadsInput = {
+  workspacePath?: string;
   sessionId?: string;
 };
 
 type DebugGetStackTraceInput = {
+  workspacePath?: string;
   sessionId?: string;
   threadId?: number;
   startFrame?: number;
@@ -47,11 +50,13 @@ type DebugGetStackTraceInput = {
 };
 
 type DebugGetScopesInput = {
+  workspacePath?: string;
   sessionId?: string;
   frameId?: number;
 };
 
 type DebugGetVariablesInput = {
+  workspacePath?: string;
   sessionId?: string;
   variablesReference?: number;
   start?: number;
@@ -59,6 +64,7 @@ type DebugGetVariablesInput = {
 };
 
 type DebugEvaluateInput = {
+  workspacePath?: string;
   sessionId?: string;
   expression?: string;
   frameId?: number;
@@ -66,11 +72,13 @@ type DebugEvaluateInput = {
 };
 
 type DebugGetTopFrameInput = {
+  workspacePath?: string;
   sessionId?: string;
   threadId?: number;
 };
 
 type DebugSnapshotInput = {
+  workspacePath?: string;
   sessionId?: string;
   threadId?: number;
   maxScopes?: number;
@@ -81,11 +89,13 @@ type DebugSnapshotInput = {
 };
 
 type DebugStatusInput = {
+  workspacePath?: string;
   sessionId?: string;
   compact?: boolean;
 };
 
 type DebugGetExceptionInfoInput = {
+  workspacePath?: string;
   sessionId?: string;
   threadId?: number;
   includeTopFrame?: boolean;

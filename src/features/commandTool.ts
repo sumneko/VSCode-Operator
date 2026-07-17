@@ -1,10 +1,18 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-type ActiveEditorSummaryToolInput = Record<string, never>;
-type HoverTopVisibleToolInput = Record<string, never>;
+type ActiveEditorSummaryToolInput = {
+  /** Optional absolute workspace path used for MCP routing in multi-workspace mode */
+  workspacePath?: string;
+};
+type HoverTopVisibleToolInput = {
+  /** Optional absolute workspace path used for MCP routing in multi-workspace mode */
+  workspacePath?: string;
+};
 
 type HoverAtPositionToolInput = {
+  /** Optional absolute workspace path used for MCP routing in multi-workspace mode */
+  workspacePath?: string;
   /** 1-based line number */
   line?: number;
   /** 1-based column number */
@@ -28,6 +36,8 @@ type ExecuteCommandToolInput = {
   command: string;
   args?: unknown[];
   argsJson?: string;
+  /** Optional absolute workspace path used for MCP routing in multi-workspace mode */
+  workspacePath?: string;
 };
 
 function hoverContentsToText(hover: vscode.Hover): string {
@@ -210,9 +220,16 @@ function buildInputValidationError(toolName: string, details: string): string {
 }
 
 function validateNoFields(toolName: string, input: Record<string, unknown>): string | undefined {
-  const unsupportedKeys = getUnsupportedInputKeys(input, []);
+  const unsupportedKeys = getUnsupportedInputKeys(input, ["workspacePath"]);
   if (unsupportedKeys.length > 0) {
     return buildInputValidationError(toolName, `unsupported fields: ${unsupportedKeys.join(", ")}.`);
+  }
+
+  if (input["workspacePath"] !== undefined) {
+    const workspacePath = input["workspacePath"];
+    if (typeof workspacePath !== "string" || workspacePath.trim().length === 0) {
+      return buildInputValidationError(toolName, "workspacePath must be a non-empty string when provided.");
+    }
   }
 
   return undefined;

@@ -94,6 +94,10 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        workspacePath: {
+          type: "string",
+          description: "Optional workspace path for multi-workspace routing"
+        },
         maxItems: {
           type: "number",
           description: "Maximum number of diagnostics to return"
@@ -127,6 +131,10 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        workspacePath: {
+          type: "string",
+          description: "Optional workspace path for multi-workspace routing"
+        },
         maxItems: {
           type: "number",
           description: "Maximum number of diagnostics to return"
@@ -160,6 +168,10 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        workspacePath: {
+          type: "string",
+          description: "Optional workspace path for multi-workspace routing"
+        },
         line: {
           type: "number",
           description: "1-based line number"
@@ -177,6 +189,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
       return {
         targetName: "vscodeOperator_hoverAtPosition",
         targetInput: {
+          workspacePath: typeof obj.workspacePath === "string" ? obj.workspacePath : undefined,
           line: typeof obj.line === "number" ? obj.line : 1,
           column: typeof obj.column === "number" ? obj.column : 1
         }
@@ -189,6 +202,10 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        workspacePath: {
+          type: "string",
+          description: "Optional workspace path for multi-workspace routing"
+        },
         line: {
           type: "number",
           description: "1-based line number"
@@ -206,6 +223,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
       return {
         targetName: "vscodeOperator_hoverAtPosition",
         targetInput: {
+          workspacePath: typeof obj.workspacePath === "string" ? obj.workspacePath : undefined,
           line: typeof obj.line === "number" ? obj.line : 1,
           column: typeof obj.column === "number" ? obj.column : 1
         }
