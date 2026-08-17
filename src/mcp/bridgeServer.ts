@@ -41,7 +41,10 @@ const SERVER_INSTRUCTIONS = [
   "For debugger workflows, prefer vscodeOperator_debugSnapshot first to avoid guessing DAP ids (threadId/frameId/variablesReference).",
   "Use vscodeOperator_debugSnapshot for stack/frame/scope context only; do not use it to decide whether the stop is an exception.",
   "To determine whether the current stop is an exception, call vscodeOperator_debugGetExceptionInfo.",
-  "Before starting a new debug session, stop stale sessions first; treat stop-before-start as the default safe policy unless explicit reuse is requested."
+  "Before starting a new debug session, stop stale sessions first; treat stop-before-start as the default safe policy unless explicit reuse is requested.",
+  "When a breakpoint is triggered, inspect the file content around the breakpoint to understand the current execution context.",
+  "Read content near a line via tools (for example read_file for a line range, vscodeOperator_hoverAtPosition for symbol info); do not infer line numbers by manually counting newline characters.",
+  "When a breakpoint triggers, the code on the breakpoint line is about to execute and has not run yet: its variables still hold pre-execution values; base conclusions on that state."
 ].join(" ");
 
 const USAGE_GUIDE_TEXT = [
@@ -64,6 +67,9 @@ const USAGE_GUIDE_TEXT = [
   "13) If you need low-level debug calls, do not guess ids: threadId <- debugGetThreads, frameId <- debugGetTopFrame/debugGetStackTrace, variablesReference <- debugGetScopes.",
   "14) If debugSnapshot/debugGetTopFrame returns no frame, pause first using debugControl(action='pause') or run to a breakpoint.",
   "15) Before calling debugStart for a new run, stop old sessions first using debugControl(action='stop') unless explicit session reuse is required.",
+  "16) When a breakpoint is triggered, inspect the file content around the breakpoint line first to understand the execution context.",
+  "17) Read content near a line via tools (read_file line range or vscodeOperator_hoverAtPosition); do not infer line numbers by manually counting newline characters.",
+  "18) At a breakpoint, the breakpoint line is about to execute (not yet run): its variables still hold pre-execution values; base conclusions on that state.",
   "",
   "Parameter hints:",
   "- vscodeOperator_hoverAtPosition: line, column",
