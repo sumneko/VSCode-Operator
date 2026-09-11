@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.12
+
+- 修复诊断路径过滤：裸目录名递归匹配，`**` 支持零层目录，并增加 `filterMatchedAnyFile` 区分过滤后为空与没有诊断。 / Fixed diagnostic path filtering: bare directories now recurse, `**` supports zero directory levels, and `filterMatchedAnyFile` distinguishes an empty filtered result from no matching diagnostic file.
+
 ## 1.2.11
 
 - MCP 端指令补充断点触发处理规则：外部 MCP 客户端通过 initialize 指令与 usage 资源即可获得"断点触发时检查附近代码、用工具读取行内容、断点行尚未执行"的说明。 / Added breakpoint-handling guidance to MCP-facing instructions: external MCP clients now receive breakpoint rules (inspect surrounding code, read lines via tools, the breakpoint line has not executed yet) through initialize instructions and the usage resource.
