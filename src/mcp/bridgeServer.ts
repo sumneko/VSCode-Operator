@@ -120,7 +120,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
               items: { type: "string" }
             }
           ],
-          description: "Optional path glob filter (absolute or workspace-relative). Accepts string/comma-separated string/array. Prefix with ! for exclusion."
+          description: "Optional minimatch path filter (absolute or workspace-relative); bare directories recurse. Accepts string/comma-separated string/array. Prefix with ! for exclusion."
         }
       }
     },
@@ -157,7 +157,7 @@ const ALIAS_DEFINITIONS: AliasDefinition[] = [
               items: { type: "string" }
             }
           ],
-          description: "Optional path glob filter (absolute or workspace-relative). Accepts string/comma-separated string/array. Prefix with ! for exclusion."
+          description: "Optional minimatch path filter (absolute or workspace-relative); bare directories recurse. Accepts string/comma-separated string/array. Prefix with ! for exclusion."
         }
       }
     },

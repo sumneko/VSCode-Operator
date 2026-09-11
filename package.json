@@ -94,7 +94,7 @@
               "default": "warning"
             },
             "pathGlob": {
-              "description": "Optional glob filter for file paths. Supports absolute and workspace-relative globs. Accepts a single string, a comma-separated string, or an array of strings. Prefix a pattern with ! to exclude matches.",
+              "description": "Optional minimatch glob filter for file paths. Supports absolute and workspace-relative globs, recursive ** semantics, and bare directory paths as recursive directory filters. Accepts a single string, a comma-separated string, or an array of strings. Prefix a pattern with ! to exclude matches.",
               "oneOf": [
                 {
                   "type": "string"
@@ -763,6 +763,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1"
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "minimatch": "^10.2.6"
   }
 }

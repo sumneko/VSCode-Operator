@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
+import { minimatch } from "minimatch";
 
 export type ProblemItem = {
   file: string;
@@ -43,7 +44,7 @@ function toSeverity(severity: vscode.DiagnosticSeverity): ProblemItem["severity"
 }
 
 export function collectProblems(): ProblemItem[] {
-  return collectProblemsWithFilters();
+  return collectProblemsWithFilters().problems;
 }
 
 function normalizeSeverity(value: unknown): SeverityName {
@@ -71,47 +72,13 @@ function toUnixPath(value: string): string {
   return value.replace(/\\/g, "/");
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
-}
-
-function globToRegExp(globPattern: string): RegExp {
-  const pattern = toUnixPath(globPattern);
-  let regex = "^";
-
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i];
-
-    if (ch === "*") {
-      const isDoubleStar = pattern[i + 1] === "*";
-      if (isDoubleStar) {
-        regex += ".*";
-        i++;
-      } else {
-        regex += "[^/]*";
-      }
-      continue;
-    }
-
-    if (ch === "?") {
-      regex += "[^/]";
-      continue;
-    }
-
-    regex += escapeRegex(ch);
-  }
-
-  regex += "$";
-  return new RegExp(regex);
-}
-
 function isAbsolutePattern(globPattern: string): boolean {
   return path.isAbsolute(globPattern) || /^[a-zA-Z]:[\\/]/.test(globPattern);
 }
 
 type CompiledPattern = {
   absolute: boolean;
-  matcher: RegExp;
+  patterns: string[];
 };
 
 function toGlobPatterns(pathGlob: string | string[] | undefined): string[] {
@@ -134,9 +101,15 @@ function toGlobPatterns(pathGlob: string | string[] | undefined): string[] {
 }
 
 function compilePattern(globPattern: string): CompiledPattern {
+  const normalized = toUnixPath(globPattern).replace(/\/$/, "");
+  const hasMagic = /[*?{}\[\]]/.test(normalized);
+  const parent = normalized.endsWith("/*") ? normalized.slice(0, -2) : normalized;
+  const isDirectoryPattern = path.posix.extname(normalized) === ""
+    && (!hasMagic || normalized.endsWith("/*"));
+
   return {
     absolute: isAbsolutePattern(globPattern),
-    matcher: globToRegExp(globPattern)
+    patterns: isDirectoryPattern ? [normalized, `${parent}/**`] : [normalized]
   };
 }
 
@@ -147,7 +120,8 @@ function matchCompiledPattern(compiled: CompiledPattern, uri: vscode.Uri): boole
   }
 
   if (compiled.absolute) {
-    return compiled.matcher.test(toUnixPath(path.normalize(filePath)));
+    const normalizedPath = toUnixPath(path.normalize(filePath));
+    return compiled.patterns.some((pattern) => minimatch(normalizedPath, pattern, { dot: true }));
   }
 
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
@@ -160,7 +134,8 @@ function matchCompiledPattern(compiled: CompiledPattern, uri: vscode.Uri): boole
     return false;
   }
 
-  return compiled.matcher.test(toUnixPath(relative));
+  const normalizedRelative = toUnixPath(relative);
+  return compiled.patterns.some((pattern) => minimatch(normalizedRelative, pattern, { dot: true }));
 }
 
 function createPathMatcher(pathGlob: string | string[] | undefined): ((uri: vscode.Uri) => boolean) | undefined {
@@ -194,17 +169,21 @@ function createPathMatcher(pathGlob: string | string[] | undefined): ((uri: vsco
 function collectProblemsWithFilters(filters?: {
   minSeverity?: SeverityName;
   pathGlob?: string | string[];
-}): ProblemItem[] {
+}): { problems: ProblemItem[]; filterMatchedAnyFile: boolean | null } {
   const minSeverity = filters?.minSeverity ?? "warning";
   const minRank = SEVERITY_RANK[minSeverity];
   const pathMatcher = createPathMatcher(filters?.pathGlob);
 
   const entries = vscode.languages.getDiagnostics();
   const problems: ProblemItem[] = [];
+  let filterMatchedAnyFile = false;
 
   for (const [uri, diagnostics] of entries) {
     if (pathMatcher && !pathMatcher(uri)) {
       continue;
+    }
+    if (pathMatcher) {
+      filterMatchedAnyFile = true;
     }
 
     for (const diagnostic of diagnostics) {
@@ -236,7 +215,10 @@ function collectProblemsWithFilters(filters?: {
     }
   }
 
-  return problems;
+  return {
+    problems,
+    filterMatchedAnyFile: pathMatcher ? filterMatchedAnyFile : null
+  };
 }
 
 export class ReadProblemsTool implements vscode.LanguageModelTool<ReadProblemsToolInput> {
@@ -251,13 +233,15 @@ export class ReadProblemsTool implements vscode.LanguageModelTool<ReadProblemsTo
     const minSeverity = normalizeSeverity(options.input.minSeverity ?? options.input.severity);
     const pathGlob = options.input.pathGlob;
 
-    const all = collectProblemsWithFilters({ minSeverity, pathGlob });
+    const collected = collectProblemsWithFilters({ minSeverity, pathGlob });
+    const all = collected.problems;
     const items = all.slice(0, maxItems);
     const payload = {
       filter: {
         minSeverity,
         pathGlob: pathGlob ?? null
       },
+      filterMatchedAnyFile: collected.filterMatchedAnyFile,
       total: all.length,
       returned: items.length,
       items

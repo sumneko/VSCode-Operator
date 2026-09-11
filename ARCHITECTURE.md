@@ -65,6 +65,9 @@ README.md                 # user-facing docs
 - absolute and workspace-relative globs
 - comma-separated string patterns and string-array patterns
 - exclusion patterns prefixed with `!`
+- bare directory paths such as `game` and `game/` match the whole directory tree
+- standard `**` semantics, including zero directory levels (`game/**/*.lua` matches `game/const.lua`)
+- `filterMatchedAnyFile` reports whether an active path filter matched any diagnostic file
 
 ## Debugger Tool Design
 
